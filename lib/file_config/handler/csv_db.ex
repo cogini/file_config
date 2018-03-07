@@ -3,8 +3,32 @@ defmodule FileConfig.Handler.CsvDb do
 
   require Lager
 
-  alias FileConfig.Lib
   alias FileConfig.Loader
+  alias FileConfig.Lib
+
+  @spec lookup(Loader.table_state, term) :: term
+  def lookup(table, key) do
+    %{id: tid, name: name, db_path: db_path} = table
+    case :ets.lookup(tid, key) do
+      [{^key, :undefined}] -> # Cached "not found" result from db
+        :undefined;
+      [{^key, value}] -> # Found result
+        {:ok, value}
+      [] ->
+        {:ok, db} = :esqlite3.open(db_path)
+        result = :esqlite3.q("SELECT value FROM kv_data where key = ?1", [key], db)
+        :esqlite3.close(db)
+
+        case result do
+          [{value}] ->
+            {:ok, Lib.decode_binary(tid, name, key, value)}
+          [] ->
+            # Cache not found result
+            true = :ets.insert(tid, [{key, :undefined}])
+            :undefined
+        end
+    end
+  end
 
   def create_table(config) do
     Lib.maybe_create_db(config.name)
@@ -107,30 +131,6 @@ defmodule FileConfig.Handler.CsvDb do
   def insert_row(_statement, params, {:error, reason}, _count) do
     Lager.error("esqlite: Error inserting #{inspect params}: #{inspect reason}")
     :ok
-  end
-
-  @spec lookup(Loader.table_state, term) :: term
-  def lookup(table, key) do
-    %{id: tid, name: name, db_path: db_path} = table
-    case :ets.lookup(tid, key) do
-      [{^key, :undefined}] -> # Cached "not found" result from db
-        :undefined;
-      [{^key, value}] -> # Found result
-        {:ok, value}
-      [] ->
-        {:ok, db} = :esqlite3.open(db_path)
-        result = :esqlite3.q("SELECT value FROM kv_data where key = ?1", [key], db)
-        :esqlite3.close(db)
-
-        case result do
-          [{value}] ->
-            {:ok, Lib.decode_binary(tid, name, key, value)}
-          [] ->
-            # Cache not found result
-            true = :ets.insert(tid, [{key, :undefined}])
-            :undefined
-        end
-    end
   end
 
 end

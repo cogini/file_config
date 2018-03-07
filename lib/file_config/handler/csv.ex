@@ -6,6 +6,15 @@ defmodule FileConfig.Handler.Csv do
   alias FileConfig.Loader
   alias FileConfig.Lib
 
+  @spec lookup(Loader.table_state, term) :: term
+  def lookup(%{id: tid, name: name}, key) do
+    case :ets.lookup(tid, key) do
+      [] -> :undefined
+      [{^key, value}] ->
+        {:ok, Lib.decode_binary(tid, name, key, value)}
+    end
+  end
+
   def create_table(config) do
     Lib.create_ets_table(config)
   end
@@ -51,15 +60,6 @@ defmodule FileConfig.Handler.Csv do
   @spec insert_records(:ets.tab, tuple() | [tuple()]) :: true
   def insert_records(tid, records) do
     :ets.insert(tid, records)
-  end
-
-  @spec lookup(Loader.table_state, term) :: term
-  def lookup(%{id: tid, name: name}, key) do
-    case :ets.lookup(tid, key) do
-      [] -> :undefined
-      [{^key, value}] ->
-        {:ok, Lib.decode_binary(tid, name, key, value)}
-    end
   end
 
 end
