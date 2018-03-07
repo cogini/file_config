@@ -44,8 +44,10 @@ defmodule FileConfig.Handler.CsvDb do
     {:ok, stat} = File.stat(db_path)
     db_mod = stat.mtime
 
+    Lager.debug("#{name} update #mod: #{inspect update.mod} db_mod: #{inspect db_mod}")
+
     if update.mod >= db_mod do
-      Lager.debug("Loading #{name} db #{path}")
+      Lager.debug("Loading #{name} db #{path} #{db_path}")
       {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, update.config])
       Lager.notice("Loaded #{name} db #{path} #{rec} rec #{time / 1_000_000} sec")
     else
@@ -67,11 +69,11 @@ defmodule FileConfig.Handler.CsvDb do
         key = Lib.rnth(k, line, len)
         value = Lib.rnth(v, line, len)
 
+        # Commit in the middle to avoid timeouts as write transactions wait for sync
         record_num = acc.record_num
         cycle = acc.cycle
         if rem(record_num, cycle) == 0 do
           db = acc.db
-          # Lager.debug("commit #{record_num} #{cycle}")
           :esqlite3.exec("commit;", db)
           :esqlite3.exec("begin;", db)
         end
@@ -81,28 +83,20 @@ defmodule FileConfig.Handler.CsvDb do
       ({:shard, _shard}, acc) -> # Called before parsing shard
         {:ok, db} = :esqlite3.open(to_charlist(db_path))
         # {:ok, statement} = :esqlite3.prepare(
-        #     "UPDATE OR IGNORE kv_data SET key=?1, value=?2 WHERE key=?1;"
-        #     "INSERT OR IGNORE INTO kv_data (key, value) VALUES(?1, ?2);",
-        #     db)
-        # {:ok, statement} = :esqlite3.prepare(
-        #     "UPDATE kv_data SET key = ?1, value = ?2 WHERE key = ?1;"
-        #     "INSERT INTO kv_data (key, value) SELECT ?1, ?2 WHERE (Select Changes() = 0);",
-        #     db)
-        {:ok, statement} = :esqlite3.prepare(
-          """
-          INSERT OR IGNORE INTO kv_data (key, value) VALUES(?1, ?2);
-          UPDATE kv_data SET key = ?1, value = ?2 WHERE key = ?1 AND (Select Changes() = 0);
-          """, db)
+        #   """
+        #   INSERT OR IGNORE INTO kv_data (key, value) VALUES(?1, ?2);
+        #   UPDATE kv_data SET key = ?1, value = ?2 WHERE key = ?1 AND (Select Changes() = 0);
+        #   """, db)
+        {:ok, statement} = :esqlite3.prepare("INSERT OR REPLACE INTO kv_data (key, value) VALUES(?1, ?2);", db)
 
         # Lager.debug("Statement ~p", [Statement]),
-        :esqlite3.exec("begin;", db)
+        :ok = :esqlite3.exec("begin;", db)
         cycle = 1000 + :rand.uniform(1000)
         Map.merge(acc, %{db: db, statement: statement, cycle: cycle})
       (:eof, acc) -> # Called after parsing shard
-        # Lager.debug("eof ~p", [Acc]),
         db = acc.db
-        :esqlite3.exec("commit;", db)
-        :esqlite3.close(db)
+        :ok = :esqlite3.exec("commit;", db)
+        :ok = :esqlite3.close(db)
         acc
     end
 
