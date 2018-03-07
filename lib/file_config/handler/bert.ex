@@ -1,6 +1,5 @@
 defmodule FileConfig.Handler.Bert do
   @moduledoc "Handler for BERT files"
-  # @app :file_config
 
   require Lager
 
