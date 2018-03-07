@@ -20,6 +20,18 @@ use Mix.Config
 #
 #     config :logger, level: :info
 #
+# These are handled by lager
+config :logger,
+  handle_otp_reports: false,
+  handle_sasl_reports: false
+
+config :logger, :console,
+  format: "$date $time $metadata[$level] $message\n",
+  device: :standard_output
+
+config :exlager,
+  level: :debug,
+  truncation_size: 8096
 
 # It is also possible to import configuration files, relative to this
 # directory. For example, you can emulate configuration per environment
@@ -27,4 +39,4 @@ use Mix.Config
 # Configuration from the imported file will override the ones defined
 # here (which is why it is important to import them last).
 #
-#     import_config "#{Mix.env}.exs"
+import_config "#{Mix.env}.exs"
