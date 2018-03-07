@@ -12,11 +12,11 @@ defmodule FileConfig.Loader do
   @type update :: map
   @type name :: atom
 
+  # GenServer callbacks
+
   def start_link(state) do
     GenServer.start_link(__MODULE__, state, name: __MODULE__)
   end
-
-  # GenServer callbacks
 
   def init(_args) do
     Process.flag(:trap_exit, true) # Die gracefully
@@ -42,7 +42,7 @@ defmodule FileConfig.Loader do
   # API
 
   @doc "Check for changes to configured files"
-  @spec check_files(files) :: {map, files}
+  @spec check_files(files) :: {[:ets.tid], files}
   def check_files(old_files) do
     file_configs = get_file_configs()
     data_dirs = data_dirs()
@@ -65,7 +65,7 @@ defmodule FileConfig.Loader do
   end
 
   @doc "Process file configs to set defaults"
-  @spec process_file_configs(Keyword.t) :: list(file_config)
+  @spec process_file_configs(list({name, map})) :: list(file_config)
   def process_file_configs(files) do
     for {config_name, config} <- files do
       # Lager.info("Loading #{config_name} #{inspect config}")
@@ -113,7 +113,7 @@ defmodule FileConfig.Loader do
   end
 
   @doc "Sort files by modification time and set overall latest time"
-  @spec sort_by_mod({name, map}, map) :: map
+  @spec sort_by_mod({name, update}, map) :: map
   def sort_by_mod({name, v}, acc) do
     # Sort files by modification time (newer to older)
     files = Enum.sort(v.files, fn({_, %{mod: a}}, {_, %{mod: b}}) -> a > b end)
@@ -185,10 +185,7 @@ defmodule FileConfig.Loader do
 
   @spec delete_tables([:ets.tid]) :: :ok
   def delete_tables(tables) do
-    for tid <- tables do
-      # :ets.delete(__MODULE__, tid)
-      :ets.delete(tid)
-    end
+    for tid <- tables, do: :ets.delete(tid)
   end
 
   @spec notify_update([map]) :: :ok
