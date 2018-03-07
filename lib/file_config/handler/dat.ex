@@ -6,6 +6,15 @@ defmodule FileConfig.Handler.Dat do
   alias FileConfig.Loader
   alias FileConfig.Lib
 
+  @spec lookup(Loader.table_state, term) :: term
+  def lookup(%{id: tid}, key) do
+    case :ets.lookup(tid, key) do
+      [] -> :undefined
+      [{^key, value}] ->
+        {:ok, value}
+    end
+  end
+
   def create_table(config) do
     Lib.create_ets_table(config)
   end
