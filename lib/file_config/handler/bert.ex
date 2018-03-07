@@ -10,17 +10,25 @@ defmodule FileConfig.Handler.Bert do
   @type namespace :: atom
   @type nrecs :: {namespace, [tuple]}
 
-  @spec load_update(Loader.update, :ets.tid) :: Loader.table_state
-  def load_update(update, tid) do
+  @spec lookup(Loader.table_state, term) :: term
+  def lookup(%{id: tid}, key) do
+    case :ets.lookup(tid, key) do
+      [] -> :undefined
+      [{^key, value}] ->
+        {:ok, value}
+    end
+  end
+
+  @spec load_update(Loader.name, Loader.update, :ets.tid) :: Loader.table_state
+  def load_update(name, update, tid) do
     # Assume updated files contain all records
-    {path, config, _mod} = hd(update.files)
-    name = config.name
+    {path, _state} = hd(update.files)
 
     Lager.debug("Loading #{name} bert #{path}")
-    {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
+    {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, update.config])
     Lager.notice("Loaded #{name} bert #{path} #{rec} rec #{time / 1_000_000} sec")
 
-    %{name: name, id: tid, mod: update.mod, type: :ets, handler: __MODULE__}
+    %{name: name, id: tid, mod: update.mod, handler: __MODULE__}
   end
 
   def create_table(config) do
@@ -86,14 +94,5 @@ defmodule FileConfig.Handler.Bert do
   # def validate_keyval1([]), do: true
   # def validate_keyval1([{_k,_v} | rest]), do: validate_keyval1(rest)
   # def validate_keyval1(_), do: false
-
-  @spec lookup(Loader.table_state, term) :: term
-  def lookup(%{id: tid}, key) do
-    case :ets.lookup(tid, key) do
-      [] -> :undefined
-      [{^key, value}] ->
-        {:ok, value}
-    end
-  end
 
 end

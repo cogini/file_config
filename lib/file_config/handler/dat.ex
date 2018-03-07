@@ -11,17 +11,16 @@ defmodule FileConfig.Handler.Dat do
     Lib.create_ets_table(config)
   end
 
-  @spec load_update(Loader.update, :ets.tid) :: Loader.table_state
-  def load_update(update, tid) do
+  @spec load_update(Loader.name, Loader.update, :ets.tid) :: Loader.table_state
+  def load_update(name, update, tid) do
     # Assume updated files contain all records
-    {path, config, _mod} = hd(update.files)
-    name = config.name
+    {path, _state} = hd(update.files)
 
     Lager.debug("Loading #{name} dat #{path}")
-    {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
+    {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, update.config])
     Lager.notice("Loaded #{name} dat #{path} #{rec} rec #{time / 1_000_000} sec")
 
-    %{name: name, id: tid, mod: update.mod, type: :ets, handler: __MODULE__}
+    %{name: name, id: tid, mod: update.mod, handler: __MODULE__}
   end
 
   @spec parse_file(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}

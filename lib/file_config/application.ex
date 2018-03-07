@@ -10,7 +10,7 @@ defmodule FileConfig.Application do
     children = [
       # Starts a worker by calling: FileConfig.Worker.start_link(arg)
       # {FileConfig.Worker, arg},
-      # {FileConfig.Loader, []},
+      {FileConfig.Loader, []},
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

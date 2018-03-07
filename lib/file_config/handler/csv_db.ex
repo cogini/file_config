@@ -11,11 +11,10 @@ defmodule FileConfig.Handler.CsvDb do
     Lib.create_ets_table(config)
   end
 
-  @spec load_update(map, :ets.tid) :: Loader.table_state
-  def load_update(update, tid) do
+  @spec load_update(Loader.name, Loader.update, :ets.tid) :: Loader.table_state
+  def load_update(name, update, tid) do
     # Assume updated files contain all records
-    {path, config, _mod} = hd(update.files)
-    name = config.name
+    {path, _state} = hd(update.files)
 
     db_path = Lib.db_path(name)
     {:ok, stat} = File.stat(db_path)
@@ -23,13 +22,13 @@ defmodule FileConfig.Handler.CsvDb do
 
     if update.mod >= db_mod do
       Lager.debug("Loading #{name} db #{path}")
-      {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
+      {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, update.config])
       Lager.notice("Loaded #{name} db #{path} #{rec} rec #{time / 1_000_000} sec")
     else
       Lager.notice("Loaded #{name} db #{path} up to date")
     end
 
-    %{name: name, id: tid, mod: update.mod, type: :db, handler: __MODULE__}
+    %{name: name, id: tid, mod: update.mod, handler: __MODULE__, db_path: to_charlist(db_path)}
   end
 
   @spec parse_file(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
@@ -111,15 +110,15 @@ defmodule FileConfig.Handler.CsvDb do
   end
 
   @spec lookup(Loader.table_state, term) :: term
-  def lookup(%{id: tid, name: name}, key) do
-    db_path = Lib.db_path(name)
+  def lookup(table, key) do
+    %{id: tid, name: name, db_path: db_path} = table
     case :ets.lookup(tid, key) do
       [{^key, :undefined}] -> # Cached "not found" result from db
         :undefined;
       [{^key, value}] -> # Found result
         {:ok, value}
       [] ->
-        {:ok, db} = :esqlite3.open(to_charlist(db_path))
+        {:ok, db} = :esqlite3.open(db_path)
         result = :esqlite3.q("SELECT value FROM kv_data where key = ?1", [key], db)
         :esqlite3.close(db)
 
