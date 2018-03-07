@@ -1,6 +1,7 @@
 %{"dialyxir": {:hex, :dialyxir, "0.5.1", "b331b091720fd93e878137add264bac4f644e1ddae07a70bf7062c7862c4b952", [:mix], [], "hexpm"},
   "esqlite": {:git, "https://github.com/mmzeeman/esqlite.git", "ab0fb5130683f2dfbe35e374119eacc900b422c1", []},
   "exlager": {:git, "https://github.com/khia/exlager.git", "3524bd9c88f0ff9f85f63f775ab971848e91db8b", []},
+  "gen_stage": {:hex, :gen_stage, "0.13.1", "edff5bca9cab22c5d03a834062515e6a1aeeb7665fb44eddae086252e39c4378", [:mix], [], "hexpm"},
   "goldrush": {:git, "https://github.com/basho/goldrush.git", "8f1b715d36b650ec1e1f5612c00e28af6ab0de82", [tag: "0.1.9"]},
   "jsx": {:git, "https://github.com/talentdeficit/jsx.git", "45ffea21a6863c58fb7da1f937e868916ff68b27", []},
   "lager": {:git, "https://github.com/basho/lager.git", "81eaef0ce98fdbf64ab95665e3bc2ec4b24c7dac", []}}

@@ -6,6 +6,7 @@ defmodule FileConfig.Loader do
   use GenServer
   require Lager
 
+  # @typedoc ""
   @type files :: map
   @type file_config :: map
   @type table_state :: map
@@ -191,7 +192,7 @@ defmodule FileConfig.Loader do
   @spec notify_update([map]) :: :ok
   def notify_update(new_tables) do
     Enum.each(new_tables, fn(%{name: name}) ->
-      :bertconf_event.notify({:load, name})
+      FileConfig.EventProducer.sync_notify({:load, name})
     end)
   end
 
