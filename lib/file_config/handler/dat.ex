@@ -1,6 +1,5 @@
 defmodule FileConfig.Handler.Dat do
   @moduledoc "Handler for dat files"
-  # @app :file_config
 
   require Lager
 
