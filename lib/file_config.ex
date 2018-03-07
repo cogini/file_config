@@ -14,7 +14,7 @@ defmodule FileConfig do
   # -opaque version() :: {vsn,term()}.
   # -export_type([namespace/0, version/0]).
 
-  # PUBLIC INTERFACE
+  # Public API
 
   @doc "Read value from named table"
   @spec read(name, term) :: :undefined | {:ok, term}
@@ -59,7 +59,7 @@ defmodule FileConfig do
     end
   end
 
-  # PRIVATE
+  # Private
 
   # @typep match :: list(term)
   # @spec loop_all(args) :: [match]
