@@ -142,7 +142,7 @@ defmodule FileConfig.Loader do
   end
 
   @doc "Load data from changed files"
-  @spec process_changed_files(files) :: table_state
+  @spec process_changed_files(files) :: list(table_state)
   def process_changed_files(changed_files) do
     for {name, update} <- changed_files do
       config = update.config
@@ -183,9 +183,9 @@ defmodule FileConfig.Loader do
     old_tables
   end
 
-  @spec delete_tables([:ets.tid]) :: :ok
+  @spec delete_tables(list(:ets.tid)) :: :ok
   def delete_tables(tables) do
-    for tid <- tables, do: :ets.delete(tid)
+    Enum.each(tables, &(:ets.delete(&1)))
   end
 
   @spec notify_update([map]) :: :ok

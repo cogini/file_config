@@ -34,7 +34,7 @@ defmodule FileConfig.Handler.Bert do
     Lib.create_ets_table(config)
   end
 
-  @spec parse_file(Path.t, :ets.tab, map) :: non_neg_integer
+  @spec parse_file(Path.t, :ets.tid, map) :: {:ok, non_neg_integer}
   def parse_file(path, tid, config) do
     {:ok, bin} = File.read(path)
     {:ok, terms} = decode(bin)
@@ -71,7 +71,7 @@ defmodule FileConfig.Handler.Bert do
 
   # Validate data to make sure it matches the format
   # [{Namespace::atom(), [{Key, Val}]}]
-  @spec validate(Keyword.t) :: Keyword.t | :no_return
+  @spec validate({atom, list(term)}) :: {atom, list(term)} | :no_return
   def validate({name, records} = u) when is_atom(name) and is_list(records), do: u
   def validate(_), do: throw(:bad_config_format)
 
