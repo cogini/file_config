@@ -71,6 +71,7 @@ defmodule FileConfig do
   defp loop_all({match, continuation}) do
     [match | loop_all(:ets.match_object(continuation))]
   end
+  defp loop_all({:undefined, _, _}), do: []
   defp loop_all({tid, pat, limit}) do
     :lists.append(loop_all(:ets.match_object(tid, pat, limit)))
   end
