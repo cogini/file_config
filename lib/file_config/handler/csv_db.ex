@@ -1,5 +1,6 @@
 defmodule FileConfig.Handler.CsvDb do
   @moduledoc "Handler for CSV files"
+  @app :file_config
 
   require Lager
 
@@ -30,23 +31,13 @@ defmodule FileConfig.Handler.CsvDb do
     end
   end
 
-  def create_table(config) do
-    Lib.maybe_create_db(config.name)
-    Lib.create_ets_table(config)
-  end
-
   @spec load_update(Loader.name, Loader.update, :ets.tid) :: Loader.table_state
   def load_update(name, update, tid) do
     # Assume updated files contain all records
     {path, _state} = hd(update.files)
 
-    db_path = Lib.db_path(name)
-    {:ok, stat} = File.stat(db_path)
-    db_mod = stat.mtime
-
-    Lager.debug("#{name} update #mod: #{inspect update.mod} db_mod: #{inspect db_mod}")
-
-    if update.mod >= db_mod do
+    db_path = db_path(name)
+    if update_db?(db_path, File.stat(db_path), update.mod) do
       Lager.debug("Loading #{name} db #{path} #{db_path}")
       {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, update.config])
       Lager.notice("Loaded #{name} db #{path} #{rec} rec #{time / 1_000_000} sec")
@@ -57,11 +48,18 @@ defmodule FileConfig.Handler.CsvDb do
     %{name: name, id: tid, mod: update.mod, handler: __MODULE__, db_path: to_charlist(db_path)}
   end
 
+  defp update_db?(db_path, {:error, :enoent}, _mod) do
+    create_db(db_path)
+    true
+  end
+  defp update_db?(_db_path, {:ok, %{mtime: mtime}}, mod) when mod > mtime, do: true
+  defp update_db?(_db_path, {:ok, _stat}, _mod), do: false
+
   @spec parse_file(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
   def parse_file(path, _tid, config) do
     {k, v} = config[:csv_fields] || {1, 2}
 
-    db_path = Lib.db_path(config.name)
+    db_path = db_path(config.name)
 
     evt = fn
       ({:line, line}, acc) -> # Called for each line
@@ -125,6 +123,21 @@ defmodule FileConfig.Handler.CsvDb do
   def insert_row(_statement, params, {:error, reason}, _count) do
     Lager.error("esqlite: Error inserting #{inspect params}: #{inspect reason}")
     :ok
+  end
+
+  @doc "Get path to db for name"
+  @spec db_path(atom) :: Path.t
+  def db_path(name) do
+    state_dir = Application.get_env(@app, :state_dir)
+    Path.join(state_dir, "#{name}.db")
+  end
+
+  defp create_db(db_path) do
+    Lager.debug("Creating db #{db_path}")
+    {:ok, db} = :esqlite3.open(to_charlist(db_path))
+    # TODO: make field sizes configurable
+    :ok = :esqlite3.exec("CREATE TABLE IF NOT EXISTS kv_data(key VARCHAR(64) PRIMARY KEY, value VARCHAR(1000));", db)
+    :ok = :esqlite3.close(db)
   end
 
 end

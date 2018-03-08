@@ -4,7 +4,6 @@ defmodule FileConfig.Handler.Bert do
   require Lager
 
   alias FileConfig.Loader
-  alias FileConfig.Lib
 
   @type namespace :: atom
   @type nrecs :: {namespace, [tuple]}
@@ -28,10 +27,6 @@ defmodule FileConfig.Handler.Bert do
     Lager.notice("Loaded #{name} bert #{path} #{rec} rec #{time / 1_000_000} sec")
 
     %{name: name, id: tid, mod: update.mod, handler: __MODULE__}
-  end
-
-  def create_table(config) do
-    Lib.create_ets_table(config)
   end
 
   @spec parse_file(Path.t, :ets.tid, map) :: {:ok, non_neg_integer}

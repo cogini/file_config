@@ -157,15 +157,23 @@ defmodule FileConfig.Loader do
   def maybe_create_table(name, mod, config) do
     case :ets.lookup(__MODULE__, name) do
       [] ->
-        Lager.debug("Creating table #{name} new")
-        config.handler.create_table(config)
+        Lager.debug("Creating ETS table #{name} new")
+        create_ets_table(config)
       [{^name, %{id: tid, mod: m}}] when m == mod ->
-        Lager.debug("Using existing table #{name}")
+        Lager.debug("Using existing ETS table #{name}")
         tid
       [{^name, %{}}] ->
-        Lager.debug("Creating table #{name} update")
-        config.handler.create_table(config)
+        Lager.debug("Creating ETS table #{name} update")
+        create_ets_table(config)
     end
+  end
+
+  @spec create_ets_table(map) :: :ets.tid
+  def create_ets_table(%{name: name, ets_opts: ets_opts}) do
+    :ets.new(name, ets_opts)
+  end
+  def create_ets_table(%{name: name}) do
+    :ets.new(name, [:set, :public, {:read_concurrency, true}, {:write_concurrency, true}])
   end
 
   @spec update_table_index([table_state]) :: [:ets.tid]

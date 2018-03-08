@@ -4,7 +4,6 @@ defmodule FileConfig.Handler.Dat do
   require Lager
 
   alias FileConfig.Loader
-  alias FileConfig.Lib
 
   @spec lookup(Loader.table_state, term) :: term
   def lookup(%{id: tid}, key) do
@@ -13,10 +12,6 @@ defmodule FileConfig.Handler.Dat do
       [{^key, value}] ->
         {:ok, value}
     end
-  end
-
-  def create_table(config) do
-    Lib.create_ets_table(config)
   end
 
   @spec load_update(Loader.name, Loader.update, :ets.tid) :: Loader.table_state

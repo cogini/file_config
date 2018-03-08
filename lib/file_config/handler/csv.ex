@@ -15,10 +15,6 @@ defmodule FileConfig.Handler.Csv do
     end
   end
 
-  def create_table(config) do
-    Lib.create_ets_table(config)
-  end
-
   @spec load_update(Loader.name, Loader.update, :ets.tid) :: Loader.table_state
   def load_update(name, update, tid) do
     # Assume updated files contain all records
