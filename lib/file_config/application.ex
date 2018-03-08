@@ -11,7 +11,7 @@ defmodule FileConfig.Application do
       # Starts a worker by calling: FileConfig.Worker.start_link(arg)
       # {FileConfig.Worker, arg},
       {FileConfig.EventProducer, []},
-      {FileConfig.EventConsumer, []},
+      # {FileConfig.EventConsumer, []},
       {FileConfig.Loader, []},
     ]
 
