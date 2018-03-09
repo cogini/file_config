@@ -58,6 +58,8 @@ defmodule FileConfig.Handler.CsvDb do
   @spec parse_file(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
   def parse_file(path, _tid, config) do
     {k, v} = config[:csv_fields] || {1, 2}
+    commit_cycle = config[:commit_cycle] || 1000
+    parser_processes = config[:parser_processes] || :erlang.system_info(:schedulers_online)
 
     db_path = db_path(config.name)
 
@@ -69,8 +71,7 @@ defmodule FileConfig.Handler.CsvDb do
 
         # Commit in the middle to avoid timeouts as write transactions wait for sync
         record_num = acc.record_num
-        cycle = acc.cycle
-        if rem(record_num, cycle) == 0 do
+        if rem(record_num, acc.cycle) == 0 do
           db = acc.db
           :esqlite3.exec("commit;", db)
           :esqlite3.exec("begin;", db)
@@ -87,10 +88,8 @@ defmodule FileConfig.Handler.CsvDb do
         #   """, db)
         {:ok, statement} = :esqlite3.prepare("INSERT OR REPLACE INTO kv_data (key, value) VALUES(?1, ?2);", db)
 
-        # Lager.debug("Statement ~p", [Statement]),
         :ok = :esqlite3.exec("begin;", db)
-        cycle = 1000 + :rand.uniform(1000)
-        Map.merge(acc, %{db: db, statement: statement, cycle: cycle})
+        Map.merge(acc, %{db: db, statement: statement, cycle: commit_cycle + :rand.uniform(commit_cycle)})
       (:eof, acc) -> # Called after parsing shard
         db = acc.db
         :ok = :esqlite3.exec("commit;", db)
@@ -99,7 +98,7 @@ defmodule FileConfig.Handler.CsvDb do
     end
 
     {:ok, bin} = File.read(path)
-    r = :file_config_csv2.pparse(bin, :erlang.system_info(:schedulers_online), evt, %{record_num: 0})
+    r = :file_config_csv2.pparse(bin, parser_processes, evt, %{record_num: 0})
     num_records = Enum.reduce(r, 0, fn(x, a) -> a + x.record_num end)
     {:ok, num_records}
   end

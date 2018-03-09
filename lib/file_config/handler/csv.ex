@@ -30,6 +30,7 @@ defmodule FileConfig.Handler.Csv do
   @spec parse_file(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
   def parse_file(path, tid, config) do
     {k, v} = config[:csv_fields] || {1, 2}
+    parser_processes = config[:parser_processes] || :erlang.system_info(:schedulers_online)
 
     evt = fn
       ({:line, line}, acc) -> # Called for each line
@@ -47,7 +48,7 @@ defmodule FileConfig.Handler.Csv do
     # {_tread, {:ok, bin}} = :timer.tc(File, :read, [path])
     # {tparse, r} = :timer.tc(:file_config_csv2, :pparse, [bin, :erlang.system_info(:schedulers_online), evt, 0])
     {:ok, bin} = File.read(path)
-    r = :file_config_csv2.pparse(bin, :erlang.system_info(:schedulers_online), evt, 0)
+    r = :file_config_csv2.pparse(bin, parser_processes, evt, 0)
     num_records = Enum.reduce(r, 0, fn(x, a) -> a + x end)
     # Lager.info("Loaded CSV file to ETS #{inspect tid} from #{path} #{num_records} records in #{tparse / 1000000} sec")
     {:ok, num_records}
