@@ -4,4 +4,5 @@
   "gen_stage": {:hex, :gen_stage, "0.13.1", "edff5bca9cab22c5d03a834062515e6a1aeeb7665fb44eddae086252e39c4378", [:mix], [], "hexpm"},
   "goldrush": {:git, "https://github.com/basho/goldrush.git", "8f1b715d36b650ec1e1f5612c00e28af6ab0de82", [tag: "0.1.9"]},
   "jsx": {:git, "https://github.com/talentdeficit/jsx.git", "45ffea21a6863c58fb7da1f937e868916ff68b27", []},
-  "lager": {:git, "https://github.com/basho/lager.git", "81eaef0ce98fdbf64ab95665e3bc2ec4b24c7dac", []}}
+  "lager": {:git, "https://github.com/basho/lager.git", "81eaef0ce98fdbf64ab95665e3bc2ec4b24c7dac", []},
+  "recon": {:hex, :recon, "2.3.4", "b406c2fccdeaa0d94e23b5e30ae3d635a2d461e363a5c9c6316897037cf050d2", [:rebar3], [], "hexpm"}}

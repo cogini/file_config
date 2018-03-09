@@ -24,6 +24,8 @@ defmodule FileConfig.Loader do
     __MODULE__ = :ets.new(__MODULE__, [:set, :public, :named_table, {:read_concurrency, true}])
 
     {old_tables, new_files} = check_files(%{})
+
+    free_binary_memory()
     {:ok, %{ref: :erlang.start_timer(check_delay(), self(), :reload),
             old_tables: old_tables, files: new_files}}
   end
@@ -33,6 +35,7 @@ defmodule FileConfig.Loader do
     {old_tables, new_files} = check_files(files)
     delete_tables(old_old_tables)
 
+    free_binary_memory()
     {:noreply, %{state | ref: :erlang.start_timer(check_delay(), self(), :reload),
       files: new_files, old_tables: old_tables}}
   end
@@ -225,6 +228,15 @@ defmodule FileConfig.Loader do
 
   def list_index do
     :ets.foldl(fn({key, value}, acc) -> [{key, value} | acc] end, [], __MODULE__)
+  end
+
+  def free_binary_memory do
+    {:binary_memory, binary_memory} = :recon.info(self(), :binary_memory)
+    if binary_memory > 500_000_000 do
+      # Manually trigger garbage collection to clear refc binary memory
+      Lager.debug("Forcing garbage collection")
+      :erlang.garbage_collect(self())
+    end
   end
 
 end
