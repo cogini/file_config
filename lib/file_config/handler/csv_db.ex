@@ -21,7 +21,7 @@ defmodule FileConfig.Handler.CsvDb do
         # :esqlite3.close(db)
 
         {:ok, results} = Sqlitex.with_db(db_path, fn(db) ->
-          Sqlitex.query(db, "SELECT value FROM kv_data where key = $1", bind: [key])
+          Sqlitex.query(db, "SELECT value FROM kv_data where key = $1", bind: [key], into: %{})
         end)
         case results do
           [result] ->
