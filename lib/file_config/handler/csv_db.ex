@@ -16,18 +16,17 @@ defmodule FileConfig.Handler.CsvDb do
       [{^key, value}] -> # Found result
         {:ok, value}
       [] ->
-        result = Sqlitex.with_db(db_path, fn(db) ->
-          Sqlitex.query(db, "SELECT value FROM kv_data where key = $1", bind: [key])
-        end)
-
         # {:ok, db} = :esqlite3.open(db_path)
         # result = :esqlite3.q("SELECT value FROM kv_data where key = ?1", [key], db)
         # :esqlite3.close(db)
 
-        case result do
-          {:ok, [{value}]} ->
-            {:ok, Lib.decode_binary(tid, name, key, value)}
-          {:ok, []} ->
+        {:ok, results} = Sqlitex.with_db(db_path, fn(db) ->
+          Sqlitex.query(db, "SELECT value FROM kv_data where key = $1", bind: [key])
+        end)
+        case results do
+          [result] ->
+            {:ok, Lib.decode_binary(tid, name, key, result.value)}
+          [] ->
             # Cache not found result
             true = :ets.insert(tid, [{key, :undefined}])
             :undefined
