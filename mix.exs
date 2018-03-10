@@ -32,12 +32,13 @@ defmodule FileConfig.Mixfile do
     [
       {:dialyxir, "~> 0.5.1", only: [:dev, :test], runtime: false},
       {:exlager, github: "khia/exlager"},
-      {:esqlite, github: "mmzeeman/esqlite"},
+      # {:esqlite, github: "mmzeeman/esqlite"},
       {:gen_stage, "~> 0.12"},
       {:jsx, github: "talentdeficit/jsx", override: true},
       {:lager, github: "basho/lager", override: true},
       # {:recon, github: "ferd/recon", override: true},
-      {:recon, "~> 2.3"}
+      {:recon, "~> 2.3"},
+      {:sqlitex, "~> 1.3"}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"},
     ]

@@ -16,9 +16,13 @@ defmodule FileConfig.Handler.CsvDb do
       [{^key, value}] -> # Found result
         {:ok, value}
       [] ->
-        {:ok, db} = :esqlite3.open(db_path)
-        result = :esqlite3.q("SELECT value FROM kv_data where key = ?1", [key], db)
-        :esqlite3.close(db)
+        result = Sqlitex.with_db(db_path, fn(db) ->
+          Sqlitex.query(db, "SELECT value FROM kv_data where key = $1", bind: [key])
+        end)
+
+        # {:ok, db} = :esqlite3.open(db_path)
+        # result = :esqlite3.q("SELECT value FROM kv_data where key = ?1", [key], db)
+        # :esqlite3.close(db)
 
         case result do
           [{value}] ->
@@ -55,13 +59,16 @@ defmodule FileConfig.Handler.CsvDb do
   defp update_db?(_db_path, {:ok, %{mtime: mtime}}, mod) when mod > mtime, do: true
   defp update_db?(_db_path, {:ok, _stat}, _mod), do: false
 
-  @spec parse_file(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
-  def parse_file(path, _tid, config) do
+  @spec parse_file_incremental(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
+  def parse_file_incremental(path, _tid, config) do
     {k, v} = config[:csv_fields] || {1, 2}
     commit_cycle = config[:commit_cycle] || 1000
     parser_processes = config[:parser_processes] || :erlang.system_info(:schedulers_online)
 
     db_path = db_path(config.name)
+
+    # {_tread, {:ok, bin}} = :timer.tc(File, :read, [path])
+    # {tparse, r} = :timer.tc(:file_config_csv2, :pparse, [bin, :erlang.system_info(:schedulers_online), evt, 0])
 
     evt = fn
       ({:line, line}, acc) -> # Called for each line
@@ -103,6 +110,73 @@ defmodule FileConfig.Handler.CsvDb do
     {:ok, num_records}
   end
 
+  @spec parse_file(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
+  def parse_file(path, _tid, config) do
+    {k, v} = config[:csv_fields] || {1, 2}
+    commit_cycle = config[:commit_cycle] || 100
+    parser_processes = config[:parser_processes] || :erlang.system_info(:schedulers_online)
+    db_path = db_path(config.name)
+
+    evt = fn
+      ({:line, line}, acc) -> # Called for each line
+        len = length(line)
+        key = Lib.rnth(k, line, len)
+        value = Lib.rnth(v, line, len)
+        [{key, value} | acc]
+      ({:shard, _shard}, acc) -> # Called before parsing shard
+        acc
+      (:eof, acc) -> # Called after parsing shard
+        acc
+    end
+
+    # {_tread, {:ok, bin}} = :timer.tc(File, :read, [path])
+    # {tparse, r} = :timer.tc(:file_config_csv2, :pparse, [bin, :erlang.system_info(:schedulers_online), evt, 0])
+
+    # {:ok, bin} = File.read(path)
+    # r = :file_config_csv2.pparse(bin, parser_processes, evt, [])
+    # records = List.flatten(r)
+    # num_records = length(records)
+    {tread, {:ok, bin}} = :timer.tc(File, :read, [path])
+    Lager.debug("#{path} read time: #{tread / 1_000_000}")
+    {tparse, r} = :timer.tc(:file_config_csv2, :pparse, [bin, parser_processes, evt, []])
+    Lager.debug("#{path} parse time: #{tparse / 1_000_000}")
+    # {tflatten, records} = :timer.tc(List, :flatten, [r])
+    # Lager.debug("tflatten: #{tflatten / 1000000}")
+    # {tlength, num_records} = :timer.tc(&length/1, [records])
+    # Lager.debug("tlength: #{tlength / 1000000}")
+    records = List.flatten(r)
+    num_records = length(records)
+
+    {time, _r} = :timer.tc(&insert_records/3, [records, db_path, commit_cycle])
+    Lager.debug("#{path} insert time #{time / 1_000_000}")
+    {:ok, num_records}
+  end
+
+  def insert_records(records, db_path, commit_cycle) do
+    chunks = Enum.chunk_every(records, commit_cycle)
+    for chunk <- chunks do
+        {:ok, db} = :esqlite3.open(to_charlist(db_path))
+        {:ok, statement} = :esqlite3.prepare("INSERT OR REPLACE INTO kv_data (key, value) VALUES(?1, ?2);", db)
+        :ok = :esqlite3.exec("begin;", db)
+        for {key, value} <- chunk, do: insert_row(statement, [key, value])
+        :ok = :esqlite3.exec("commit;", db)
+        :ok = :esqlite3.close(db)
+    end
+    :ok
+  end
+
+  def commit(db) do
+    try do
+      :ok = :esqlite3.exec("commit;", db)
+    catch
+      {:error, :timeout, _ref} ->
+        Lager.warning("sqlite3 timeout")
+        commit(db)
+      error ->
+        Lager.warning("sqlite3 error #{inspect error}")
+    end
+  end
+
   def insert_row(statement, params), do: insert_row(statement, params, :first, 1)
 
   def insert_row(statement, params, :first, count) do
@@ -133,10 +207,13 @@ defmodule FileConfig.Handler.CsvDb do
 
   defp create_db(db_path) do
     Lager.debug("Creating db #{db_path}")
-    {:ok, db} = :esqlite3.open(to_charlist(db_path))
+    Sqlitex.with_db(db_path, fn(db) ->
+      Sqlitex.query(db, "CREATE TABLE IF NOT EXISTS kv_data(key VARCHAR(64) PRIMARY KEY, value VARCHAR(1000));")
+    end)
     # TODO: make field sizes configurable
-    :ok = :esqlite3.exec("CREATE TABLE IF NOT EXISTS kv_data(key VARCHAR(64) PRIMARY KEY, value VARCHAR(1000));", db)
-    :ok = :esqlite3.close(db)
+    # {:ok, db} = :esqlite3.open(to_charlist(db_path))
+    # :ok = :esqlite3.exec("CREATE TABLE IF NOT EXISTS kv_data(key VARCHAR(64) PRIMARY KEY, value VARCHAR(1000));", db)
+    # :ok = :esqlite3.close(db)
   end
 
 end
