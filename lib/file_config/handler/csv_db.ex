@@ -25,9 +25,9 @@ defmodule FileConfig.Handler.CsvDb do
         # :esqlite3.close(db)
 
         case result do
-          [{value}] ->
+          {:ok, [{value}]} ->
             {:ok, Lib.decode_binary(tid, name, key, value)}
-          [] ->
+          {:ok, []} ->
             # Cache not found result
             true = :ets.insert(tid, [{key, :undefined}])
             :undefined
