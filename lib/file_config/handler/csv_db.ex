@@ -103,6 +103,7 @@ defmodule FileConfig.Handler.CsvDb do
     :ok = :esqlite3.close(db)
 
     Lager.debug("open time: #{topen / 1000000}, process time: #{process_duration}, commit time: #{tcommit / 1000000}")
+    # Lager.debug("open time: #{topen / 1000000}, process time: #{process_duration}")
 
     {:ok, length(results)}
   end
@@ -213,17 +214,6 @@ defmodule FileConfig.Handler.CsvDb do
     :ok
   end
 
-  def commit(db) do
-    try do
-      :ok = :esqlite3.exec("commit;", db)
-    catch
-      {:error, :timeout, _ref} ->
-        Lager.warning("sqlite3 timeout")
-        commit(db)
-      error ->
-        Lager.warning("sqlite3 error #{inspect error}")
-    end
-  end
 
   def insert_row(statement, params), do: insert_row(statement, params, :first, 1)
 
@@ -253,6 +243,13 @@ defmodule FileConfig.Handler.CsvDb do
     Path.join(state_dir, "#{name}.db")
   end
 
+  @doc "Get path to flag file for name"
+  @spec flag_path(atom) :: Path.t
+  def flag_path(name) do
+    state_dir = Application.get_env(@app, :state_dir)
+    Path.join(state_dir, "#{name}.flag")
+  end
+
   defp create_db(db_path) do
     Lager.debug("Creating db #{db_path}")
     Sqlitex.with_db(db_path, fn(db) ->
@@ -262,6 +259,18 @@ defmodule FileConfig.Handler.CsvDb do
     # {:ok, db} = :esqlite3.open(to_charlist(db_path))
     # :ok = :esqlite3.exec("CREATE TABLE IF NOT EXISTS kv_data(key VARCHAR(64) PRIMARY KEY, value VARCHAR(1000));", db)
     # :ok = :esqlite3.close(db)
+  end
+
+  def commit(db) do
+    try do
+      :ok = :esqlite3.exec("commit;", db)
+    catch
+      {:error, :timeout, _ref} ->
+        Lager.warning("sqlite3 timeout")
+        commit(db)
+      error ->
+        Lager.warning("sqlite3 error #{inspect error}")
+    end
   end
 
 end
