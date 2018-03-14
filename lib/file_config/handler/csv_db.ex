@@ -2,6 +2,11 @@ defmodule FileConfig.Handler.CsvDb do
   @moduledoc "Handler for CSV files"
   @app :file_config
 
+  # NimbleCSV.define(FileConfig.Handler.CsvDb.Parser, separator: "\t", escape: "\"", headers: false)
+  NimbleCSV.define(FileConfig.Handler.CsvDb.Parser, separator: "\t", escape: "\0", headers: false)
+
+  alias FileConfig.Handler.CsvDb.Parser
+
   require Lager
 
   alias FileConfig.Loader
@@ -58,6 +63,50 @@ defmodule FileConfig.Handler.CsvDb do
   defp update_db?(_db_path, {:ok, %{mtime: mtime}}, mod) when mod > mtime, do: true
   defp update_db?(_db_path, {:ok, _stat}, _mod), do: false
 
+  defp open_db(db_path) when is_binary(db_path) do
+    open_db(to_charlist(db_path))
+  end
+  defp open_db(db_path) when is_list(db_path) do
+    {:ok, db} = :esqlite3.open(db_path)
+    {:ok, statement} = :esqlite3.prepare("INSERT OR REPLACE INTO kv_data (key, value) VALUES(?1, ?2);", db)
+    {db, statement}
+  end
+
+  def make_fetch_fn(%{csv_fields: {key_field, value_field}}) do
+    key_index = key_field - 1
+    value_index = value_field - 1
+    fn row -> [Enum.at(row, key_index), Enum.at(row, value_index)] end
+  end
+  def make_fetch_fn(_) do
+    fn [key, value | _rest] -> [key, value] end
+  end
+
+  @spec parse_file(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
+  def parse_file(path, _tid, config) do
+    fetch_fn = make_fetch_fn(config)
+    db_path = db_path(config.name)
+
+    {topen, {db, statement}} = :timer.tc(&open_db/1, [db_path])
+    :ok = :esqlite3.exec("begin;", db)
+    start_time = :os.timestamp()
+
+    stream = path
+    |> File.stream!(read_ahead: 100_000)
+    |> Parser.parse_stream
+    |> Stream.map(&( insert_row(statement, fetch_fn.(&1))))
+    results = Enum.to_list(stream)
+
+    process_duration = :timer.now_diff(:os.timestamp(), start_time) / 1_000_000
+
+    #:ok = :esqlite3.exec("commit;", db)
+    {tcommit, :ok} = :timer.tc(:esqlite3, :exec, ["commit;", db])
+    :ok = :esqlite3.close(db)
+
+    Lager.debug("open time: #{topen / 1000000}, process time: #{process_duration}, commit time: #{tcommit / 1000000}")
+
+    {:ok, length(results)}
+  end
+
   @spec parse_file_incremental(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
   def parse_file_incremental(path, _tid, config) do
     {k, v} = config[:csv_fields] || {1, 2}
@@ -109,8 +158,8 @@ defmodule FileConfig.Handler.CsvDb do
     {:ok, num_records}
   end
 
-  @spec parse_file(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
-  def parse_file(path, _tid, config) do
+  @spec parse_file2(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
+  def parse_file2(path, _tid, config) do
     {k, v} = config[:csv_fields] || {1, 2}
     commit_cycle = config[:commit_cycle] || 100
     parser_processes = config[:parser_processes] || :erlang.system_info(:schedulers_online)
