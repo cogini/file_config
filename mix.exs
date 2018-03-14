@@ -37,6 +37,7 @@ defmodule FileConfig.Mixfile do
       {:jsx, github: "talentdeficit/jsx", override: true},
       {:lager, github: "basho/lager", override: true},
       # {:recon, github: "ferd/recon", override: true},
+      {:nimble_csv, "~> 0.3"},
       {:recon, "~> 2.3"},
       {:sqlitex, "~> 1.3"}
       # {:dep_from_hexpm, "~> 0.3.0"},
