@@ -21,10 +21,6 @@ defmodule FileConfig.Handler.CsvDb do
       [{^key, value}] -> # Found result
         {:ok, value}
       [] ->
-        # {:ok, db} = :esqlite3.open(db_path)
-        # result = :esqlite3.q("SELECT value FROM kv_data where key = ?1", [key], db)
-        # :esqlite3.close(db)
-
         {:ok, results} = Sqlitex.with_db(db_path, fn(db) ->
           Sqlitex.query(db, "SELECT value FROM kv_data where key = $1", bind: [key], into: %{})
         end)
@@ -45,9 +41,10 @@ defmodule FileConfig.Handler.CsvDb do
     {path, _state} = hd(update.files)
 
     db_path = db_path(name)
-    if update_db?(db_path, File.stat(db_path), update.mod) do
+    if update_db?(File.stat(flag_path(name)), update.mod) do
+      maybe_create_db(db_path)
       Lager.debug("Loading #{name} db #{path} #{db_path}")
-      {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, update.config])
+      {time, {:ok, rec}} = :timer.tc(&parse_file/3, [path, tid, update.config])
       Lager.notice("Loaded #{name} db #{path} #{rec} rec #{time / 1_000_000} sec")
     else
       Lager.notice("Loaded #{name} db #{path} up to date")
@@ -56,21 +53,10 @@ defmodule FileConfig.Handler.CsvDb do
     %{name: name, id: tid, mod: update.mod, handler: __MODULE__, db_path: to_charlist(db_path)}
   end
 
-  defp update_db?(db_path, {:error, :enoent}, _mod) do
-    create_db(db_path)
-    true
-  end
-  defp update_db?(_db_path, {:ok, %{mtime: mtime}}, mod) when mod > mtime, do: true
-  defp update_db?(_db_path, {:ok, _stat}, _mod), do: false
-
-  defp open_db(db_path) when is_binary(db_path) do
-    open_db(to_charlist(db_path))
-  end
-  defp open_db(db_path) when is_list(db_path) do
-    {:ok, db} = :esqlite3.open(db_path)
-    {:ok, statement} = :esqlite3.prepare("INSERT OR REPLACE INTO kv_data (key, value) VALUES(?1, ?2);", db)
-    {db, statement}
-  end
+  @spec update_db?({:ok, File.Stat.t} | {:error, File.posix}, :calendar.datetime) :: boolean
+  defp update_db?({:error, :enoent}, _mod), do: true
+  defp update_db?({:ok, %{mtime: mtime}}, mod) when mod > mtime, do: true
+  defp update_db?({:ok, _stat}, _mod), do: false
 
   def make_fetch_fn(%{csv_fields: {key_field, value_field}}) do
     key_index = key_field - 1
@@ -86,14 +72,15 @@ defmodule FileConfig.Handler.CsvDb do
     fetch_fn = make_fetch_fn(config)
     db_path = db_path(config.name)
 
-    {topen, {db, statement}} = :timer.tc(&open_db/1, [db_path])
+    {topen, {:ok, db}} = :timer.tc(&Sqlitex.open/1, [db_path])
+    {:ok, statement} = :esqlite3.prepare("INSERT OR REPLACE INTO kv_data (key, value) VALUES(?1, ?2);", db)
     :ok = :esqlite3.exec("begin;", db)
     start_time = :os.timestamp()
 
     stream = path
     |> File.stream!(read_ahead: 100_000)
     |> Parser.parse_stream
-    |> Stream.map(&( insert_row(statement, fetch_fn.(&1))))
+    |> Stream.map(&(insert_row(statement, fetch_fn.(&1))))
     results = Enum.to_list(stream)
 
     process_duration = :timer.now_diff(:os.timestamp(), start_time) / 1_000_000
@@ -101,6 +88,8 @@ defmodule FileConfig.Handler.CsvDb do
     #:ok = :esqlite3.exec("commit;", db)
     {tcommit, :ok} = :timer.tc(:esqlite3, :exec, ["commit;", db])
     :ok = :esqlite3.close(db)
+
+    :ok = File.touch(flag_path(config.name))
 
     Lager.debug("open time: #{topen / 1000000}, process time: #{process_duration}, commit time: #{tcommit / 1000000}")
     # Lager.debug("open time: #{topen / 1000000}, process time: #{process_duration}")
@@ -136,7 +125,7 @@ defmodule FileConfig.Handler.CsvDb do
         :ok = insert_row(statement, [key, value])
         %{acc | record_num: record_num + 1}
       ({:shard, _shard}, acc) -> # Called before parsing shard
-        {:ok, db} = :esqlite3.open(to_charlist(db_path))
+        {:ok, db} = Sqlitex.open(db_path)
         # {:ok, statement} = :esqlite3.prepare(
         #   """
         #   INSERT OR IGNORE INTO kv_data (key, value) VALUES(?1, ?2);
@@ -204,7 +193,7 @@ defmodule FileConfig.Handler.CsvDb do
   def insert_records(records, db_path, commit_cycle) do
     chunks = Enum.chunk_every(records, commit_cycle)
     for chunk <- chunks do
-        {:ok, db} = :esqlite3.open(to_charlist(db_path))
+        {:ok, db} = Sqlitex.open(db_path)
         {:ok, statement} = :esqlite3.prepare("INSERT OR REPLACE INTO kv_data (key, value) VALUES(?1, ?2);", db)
         :ok = :esqlite3.exec("begin;", db)
         for {key, value} <- chunk, do: insert_row(statement, [key, value])
@@ -250,15 +239,22 @@ defmodule FileConfig.Handler.CsvDb do
     Path.join(state_dir, "#{name}.flag")
   end
 
+  @spec maybe_create_db(Path.t) :: [[]] | Sqlitex.sqlite_error
+  defp maybe_create_db(db_path) do
+    if File.exists?(db_path) do
+      [[]]
+    else
+      create_db(db_path)
+    end
+  end
+
+  @spec create_db(Path.t) :: [[]] | Sqlitex.sqlite_error
   defp create_db(db_path) do
     Lager.debug("Creating db #{db_path}")
     Sqlitex.with_db(db_path, fn(db) ->
+      # TODO: make field sizes configurable
       Sqlitex.query(db, "CREATE TABLE IF NOT EXISTS kv_data(key VARCHAR(64) PRIMARY KEY, value VARCHAR(1000));")
     end)
-    # TODO: make field sizes configurable
-    # {:ok, db} = :esqlite3.open(to_charlist(db_path))
-    # :ok = :esqlite3.exec("CREATE TABLE IF NOT EXISTS kv_data(key VARCHAR(64) PRIMARY KEY, value VARCHAR(1000));", db)
-    # :ok = :esqlite3.close(db)
   end
 
   def commit(db) do
