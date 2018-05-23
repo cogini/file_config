@@ -33,6 +33,17 @@ defmodule FileConfig do
     end
   end
 
+  @doc "Insert records"
+  @spec insert(name, {atom, term} | [{atom, term}]) :: true
+  def insert(name, records) do
+    case table_info(name) do
+      :undefined ->
+        true
+      %{handler: handler, id: tid} ->
+        handler.insert_records(tid, records)
+    end
+  end
+
   @doc "Return all records in table"
   @spec all(name, non_neg_integer) :: list(term)
   def all(name, match_limit) do
