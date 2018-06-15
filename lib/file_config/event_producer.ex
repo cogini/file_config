@@ -1,12 +1,12 @@
 defmodule FileConfig.EventProducer do
   use GenStage
 
-  @doc "Starts the broadcaster."
+  @doc "Start the broadcaster"
   def start_link(state) do
     GenStage.start_link(__MODULE__, state, name: __MODULE__)
   end
 
-  @doc "Sends an event and returns only after the event is dispatched."
+  @doc "Send an event and return only after the event is dispatched"
   def sync_notify(event, timeout \\ 5000) do
     GenStage.call(__MODULE__, {:notify, event}, timeout)
   end
@@ -23,4 +23,3 @@ defmodule FileConfig.EventProducer do
     {:noreply, [], state} # We don't care about the demand
   end
 end
-

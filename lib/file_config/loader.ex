@@ -200,6 +200,7 @@ defmodule FileConfig.Loader do
     Enum.each(tables, &(:ets.delete(&1)))
   end
 
+  @doc "Notify subscribers about updates"
   @spec notify_update([map]) :: :ok
   def notify_update(new_tables) do
     Enum.each(new_tables, fn(%{name: name}) ->
