@@ -6,15 +6,17 @@ defmodule FileConfig.Handler.Csv do
   alias FileConfig.Loader
   alias FileConfig.Lib
 
+  # @impl true
   @spec lookup(Loader.table_state, term) :: term
-  def lookup(%{id: tid, name: name}, key) do
+  def lookup(%{id: tid, name: name, data_parser: data_parser}, key) do
     case :ets.lookup(tid, key) do
       [] -> :undefined
       [{^key, value}] ->
-        {:ok, Lib.decode_binary(tid, name, key, value)}
+        {:ok, data_parser.parse_value(name, key, value)}
     end
   end
 
+  # @impl true
   @spec load_update(Loader.name, Loader.update, :ets.tid) :: Loader.table_state
   def load_update(name, update, tid) do
     # Assume updated files contain all records
@@ -26,6 +28,14 @@ defmodule FileConfig.Handler.Csv do
 
     %{name: name, id: tid, mod: update.mod, handler: __MODULE__}
   end
+
+  # @impl true
+  @spec insert_records(:ets.tab, tuple() | [tuple()]) :: true
+  def insert_records(tid, records) do
+    :ets.insert(tid, records)
+  end
+
+  # Internal functions
 
   @spec parse_file(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
   def parse_file(path, tid, config) do
@@ -52,11 +62,6 @@ defmodule FileConfig.Handler.Csv do
     num_records = Enum.reduce(r, 0, fn(x, a) -> a + x end)
     # Lager.info("Loaded CSV file to ETS #{inspect tid} from #{path} #{num_records} records in #{tparse / 1000000} sec")
     {:ok, num_records}
-  end
-
-  @spec insert_records(:ets.tab, tuple() | [tuple()]) :: true
-  def insert_records(tid, records) do
-    :ets.insert(tid, records)
   end
 
 end
