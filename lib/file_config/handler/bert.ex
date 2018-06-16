@@ -8,15 +8,17 @@ defmodule FileConfig.Handler.Bert do
   @type namespace :: atom
   @type nrecs :: {namespace, [tuple]}
 
+  # @impl true
   @spec lookup(Loader.table_state, term) :: term
-  def lookup(%{id: tid}, key) do
+  def lookup(%{id: tid, name: name, data_parser: data_parser}, key) do
     case :ets.lookup(tid, key) do
       [] -> :undefined
       [{^key, value}] ->
-        {:ok, value}
+        {:ok, data_parser.parse_value(name, key, value)}
     end
   end
 
+  # @impl true
   @spec load_update(Loader.name, Loader.update, :ets.tid) :: Loader.table_state
   def load_update(name, update, tid) do
     # Assume updated files contain all records
@@ -29,6 +31,13 @@ defmodule FileConfig.Handler.Bert do
     %{name: name, id: tid, mod: update.mod, handler: __MODULE__}
   end
 
+  # @impl true
+  @spec insert_records(:ets.tab, tuple() | [tuple()]) :: true
+  def insert_records(tid, records) do
+    :ets.insert(tid, records)
+  end
+
+  # Internal functions
   @spec parse_file(Path.t, :ets.tid, map) :: {:ok, non_neg_integer}
   def parse_file(path, tid, config) do
     {:ok, bin} = File.read(path)
@@ -43,11 +52,6 @@ defmodule FileConfig.Handler.Bert do
     {:ok, length(records)}
   end
 
-  @spec insert_records(:ets.tab, tuple() | [tuple()]) :: true
-  def insert_records(tid, records) do
-    :ets.insert(tid, records)
-  end
-
   @spec decode(binary) :: {:ok, term} | {:error, term}
   def decode(bin) when is_binary(bin) do
     try do
@@ -60,9 +64,9 @@ defmodule FileConfig.Handler.Bert do
 
   # @doc "Optionally apply a transformation function to data"
   @spec transform([nrecs] | nrecs, map) :: nrecs
-  def transform([nrecs], config), do: transform(nrecs, config)
-  def transform({name, records}, %{transform_fun: {m, f, a}}), do: apply(m, f, [{name, records}] ++ a)
-  def transform({name, records}, _config), do: {name, records}
+  defp transform([nrecs], config), do: transform(nrecs, config)
+  defp transform({name, records}, %{transform_fun: {m, f, a}}), do: apply(m, f, [{name, records}] ++ a)
+  defp transform({name, records}, _config), do: {name, records}
 
   # Validate data to make sure it matches the format
   # [{Namespace::atom(), [{Key, Val}]}]
