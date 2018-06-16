@@ -16,17 +16,26 @@ defmodule FileConfig.Lib do
     :lists.nth(l - i, list)
   end
 
-  @spec decode_binary(:ets.tid, atom, term, term) :: term
-  def decode_binary(tid, name, key, value) when is_binary(value) do
-    if :jsx.is_json(value) do
-      value = :jsx.decode(value, [{:labels, :atom}, :return_maps])
-      true = :ets.insert(tid, {key, value})
-      value
-    else
-      Lager.debug("Invalid binary JSON for table #{name} key #{key}")
-      value
+  @spec decode_json!(:ets.tid, atom, term, term) :: term
+  def decode_json!(tid, name, key, value) when is_binary(value) do
+    # case Jason.decode(value, keys: :atoms, strings: :copy) do
+    case Jason.decode(value, keys: :atoms) do
+      {:ok, value} ->
+        true = :ets.insert(tid, {key, value})
+        value
+      {:error, reason} ->
+        Lager.debug("Invalid binary JSON for table #{name} key #{key}: #{inspect reason}")
+        value
     end
+    # if :jsx.is_json(value) do
+    #   value = :jsx.decode(value, [{:labels, :atom}, :return_maps])
+    #   true = :ets.insert(tid, {key, value})
+    #   value
+    # else
+    #   Lager.debug("Invalid binary JSON for table #{name} key #{key}")
+    #   value
+    # end
   end
-  def decode_binary(_tid, _name, _key, value), do: value
+  def decode_json!(_tid, _name, _key, value), do: value
 
 end
