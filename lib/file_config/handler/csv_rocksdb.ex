@@ -47,23 +47,36 @@ defmodule FileConfig.Handler.CsvRocksdb do
     config = update.config
     chunk_size = config[:chunk_size] || 100
 
-    {time, {:ok, rec}} = :timer.tc(&parse_file/3, [path, db_path, chunk_size])
-    Lager.notice("Loaded #{name} csv #{path} #{rec} rec #{time / 1_000_000} sec")
+    if update_db?(db_path, update.mod) do
+      Lager.debug("Loading #{name} rocksdb #{path} #{db_path}")
+      {time, {:ok, rec}} = :timer.tc(&parse_file/3, [path, db_path, chunk_size])
+      Lager.notice("Loaded #{name} csv #{path} #{rec} rec #{time / 1_000_000} sec")
+    else
+      Lager.notice("Loaded #{name} rocksdb #{db_path} up to date")
+    end
 
-    %{name: name, id: tid, mod: update.mod, handler: __MODULE__, db_path: db_path}
+    %{name: name, id: tid, mod: update.mod, handler: __MODULE__, db_path: to_charlist(db_path)}
   end
 
   # @impl true
-  # def insert_records(records) do
-  #   chunks = Enum.chunk_every(records, chunk_size)
-  #   write_chunks(chunks)
-  #   :ok
-  # end
+  @spec insert_records(:ets.tab, atom, [tuple()]) :: true
+  def insert_records(tab, name, records) do
+    chunk_size = 100
+
+    {:ok, db} = :rocksdb.open(to_charlist(db_path(name)), create_if_missing: false)
+
+    records
+    |> Enum.sort
+    |> Enum.chunk_every(chunk_size)
+    |> Enum.map(&insert_chunk(&1, tab, db))
+
+    :ok = :rocksdb.close(db)
+  end
 
   # Internal functions
 
   defp parse_file(path, db_path, chunk_size) do
-    {topen, {:ok, db}} = :timer.tc(:rocksdb, :open, [db_path, [create_if_missing: true]])
+    {topen, {:ok, db}} = :timer.tc(:rocksdb, :open, [to_charlist(db_path), [create_if_missing: true]])
 
     stream = path
     |> File.stream!(read_ahead: 100_000)
@@ -89,7 +102,7 @@ defmodule FileConfig.Handler.CsvRocksdb do
   @spec db_path(atom) :: Path.t
   defp db_path(name) do
     state_dir = Application.get_env(@app, :state_dir)
-    to_charlist(Path.join(state_dir, to_string(name)))
+    Path.join(state_dir, to_string(name))
   end
 
   def write_chunk(chunk, db) do
@@ -97,6 +110,39 @@ defmodule FileConfig.Handler.CsvRocksdb do
     # :rocksdb.write(db, batch, sync: true)
     {duration, :ok} = :timer.tc(:rocksdb, :write, [db, batch, []])
     {length(batch), duration}
+  end
+
+  defp insert_chunk(chunk, tab, db) do
+    batch = for {key, value} <- chunk, do: {:put, key, value}
+    {duration, :ok} = :timer.tc(:rocksdb, :write, [db, batch, []])
+    :ok = :ets.insert(tab, chunk)
+
+    {length(batch), duration}
+  end
+
+  @spec update_db?(Path.t, :calendar.datetime) :: boolean
+  defp update_db?(path, update_mtime) do
+    case File.stat(path) do
+      {:ok, _dir_stat} ->
+        case File.stat(Path.join(path, "CURRENT")) do
+          {:ok, %{mtime: file_mtime}} ->
+            file_mtime < update_mtime
+          {:error, _reason} ->
+            true
+        end
+
+        # case File.ls(path) do
+        #   {:ok, files} ->
+        #     file_times = for file <- files, file_path <- Path.join(path, file),
+        #       {:ok, %{mtime: file_mtime}} <- File.stat(file_path), do: file_mtime
+        #     Enum.all?(file_times, &(&1 < mod))
+        #   {:error, reason} ->
+        #     Lager.warning("Error reading path #{path}: #{reason}")
+        #     true
+        # end
+      {:error, :noent} ->
+        true
+    end
   end
 
 end
