@@ -1,20 +1,20 @@
-defmodule FileConfig.Handler.CsvDb do
-  @moduledoc "Handler for CSV files"
+defmodule FileConfig.Handler.CsvSqlite do
+  @moduledoc "Handler for CSV files with sqlite backend"
   @app :file_config
 
-  # NimbleCSV.define(FileConfig.Handler.CsvDb.Parser, separator: "\t", escape: "\"", headers: false)
-  NimbleCSV.define(FileConfig.Handler.CsvDb.Parser, separator: "\t", escape: "\0", headers: false)
+  NimbleCSV.define(FileConfig.Handler.CsvSqlite.Parser, separator: "\t", escape: "\0", headers: false)
 
-  alias FileConfig.Handler.CsvDb.Parser
+  alias FileConfig.Handler.CsvSqlite.Parser
 
   require Lager
 
   alias FileConfig.Loader
   alias FileConfig.Lib
 
+  # @impl true
   @spec lookup(Loader.table_state, term) :: term
   def lookup(table, key) do
-    %{id: tid, name: name, db_path: db_path} = table
+    %{id: tid, name: name, db_path: db_path, data_parser: data_parser} = table
     case :ets.lookup(tid, key) do
       [{^key, :undefined}] -> # Cached "not found" result from db
         :undefined;
@@ -25,8 +25,8 @@ defmodule FileConfig.Handler.CsvDb do
           Sqlitex.query(db, "SELECT value FROM kv_data where key = $1", bind: [key], into: %{})
         end)
         case results do
-          [result] ->
-            {:ok, Lib.decode_binary(tid, name, key, result.value)}
+          [value] ->
+            {:ok, data_parser.parse_value(name, key, value)}
           [] ->
             # Cache not found result
             true = :ets.insert(tid, [{key, :undefined}])
@@ -35,6 +35,7 @@ defmodule FileConfig.Handler.CsvDb do
     end
   end
 
+  # @impl true
   @spec load_update(Loader.name, Loader.update, :ets.tid) :: Loader.table_state
   def load_update(name, update, tid) do
     # Assume updated files contain all records
@@ -53,22 +54,38 @@ defmodule FileConfig.Handler.CsvDb do
     %{name: name, id: tid, mod: update.mod, handler: __MODULE__, db_path: to_charlist(db_path)}
   end
 
+  # @impl true
+  def insert_records(records, db_path, commit_cycle) do
+    chunks = Enum.chunk_every(records, commit_cycle)
+    for chunk <- chunks do
+      {:ok, db} = Sqlitex.open(db_path)
+      {:ok, statement} = :esqlite3.prepare("INSERT OR REPLACE INTO kv_data (key, value) VALUES(?1, ?2);", db)
+      :ok = :esqlite3.exec("begin;", db)
+      for {key, value} <- chunk, do: insert_row(statement, [key, value])
+      :ok = :esqlite3.exec("commit;", db)
+      :ok = :esqlite3.close(db)
+    end
+    :ok
+  end
+
+  # Internal functions
+
   @spec update_db?({:ok, File.Stat.t} | {:error, File.posix}, :calendar.datetime) :: boolean
   defp update_db?({:error, :enoent}, _mod), do: true
   defp update_db?({:ok, %{mtime: mtime}}, mod) when mod > mtime, do: true
   defp update_db?({:ok, _stat}, _mod), do: false
 
-  def make_fetch_fn(%{csv_fields: {key_field, value_field}}) do
+  defp make_fetch_fn(%{csv_fields: {key_field, value_field}}) do
     key_index = key_field - 1
     value_index = value_field - 1
     fn row -> [Enum.at(row, key_index), Enum.at(row, value_index)] end
   end
-  def make_fetch_fn(_) do
+  defp make_fetch_fn(_) do
     fn [key, value | _rest] -> [key, value] end
   end
 
   @spec parse_file(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
-  def parse_file(path, _tid, config) do
+  defp parse_file(path, _tid, config) do
     fetch_fn = make_fetch_fn(config)
     db_path = db_path(config.name)
 
@@ -98,7 +115,7 @@ defmodule FileConfig.Handler.CsvDb do
   end
 
   @spec parse_file_incremental(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
-  def parse_file_incremental(path, _tid, config) do
+  defp parse_file_incremental(path, _tid, config) do
     {k, v} = config[:csv_fields] || {1, 2}
     commit_cycle = config[:commit_cycle] || 1000
     parser_processes = config[:parser_processes] || :erlang.system_info(:schedulers_online)
@@ -149,7 +166,7 @@ defmodule FileConfig.Handler.CsvDb do
   end
 
   @spec parse_file2(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
-  def parse_file2(path, _tid, config) do
+  defp parse_file2(path, _tid, config) do
     {k, v} = config[:csv_fields] || {1, 2}
     commit_cycle = config[:commit_cycle] || 100
     parser_processes = config[:parser_processes] || :erlang.system_info(:schedulers_online)
@@ -190,51 +207,37 @@ defmodule FileConfig.Handler.CsvDb do
     {:ok, num_records}
   end
 
-  def insert_records(records, db_path, commit_cycle) do
-    chunks = Enum.chunk_every(records, commit_cycle)
-    for chunk <- chunks do
-        {:ok, db} = Sqlitex.open(db_path)
-        {:ok, statement} = :esqlite3.prepare("INSERT OR REPLACE INTO kv_data (key, value) VALUES(?1, ?2);", db)
-        :ok = :esqlite3.exec("begin;", db)
-        for {key, value} <- chunk, do: insert_row(statement, [key, value])
-        :ok = :esqlite3.exec("commit;", db)
-        :ok = :esqlite3.close(db)
-    end
-    :ok
-  end
+  defp insert_row(statement, params), do: insert_row(statement, params, :first, 1)
 
-
-  def insert_row(statement, params), do: insert_row(statement, params, :first, 1)
-
-  def insert_row(statement, params, :first, count) do
+  defp insert_row(statement, params, :first, count) do
     :ok = :esqlite3.bind(statement, params)
     insert_row(statement, params, :esqlite3.step(statement), count)
   end
-  def insert_row(statement, params, :"$busy", count) do
+  defp insert_row(statement, params, :"$busy", count) do
     :timer.sleep(10)
     insert_row(statement, params, :esqlite3.step(statement), count + 1)
   end
-  def insert_row(_statement, _params, :"$done", count) do
+  defp insert_row(_statement, _params, :"$done", count) do
     if count > 1 do
       Lager.debug("sqlite3 busy count: #{count}")
     end
     :ok
   end
-  def insert_row(_statement, params, {:error, reason}, _count) do
+  defp insert_row(_statement, params, {:error, reason}, _count) do
     Lager.error("esqlite: Error inserting #{inspect params}: #{inspect reason}")
     :ok
   end
 
   @doc "Get path to db for name"
   @spec db_path(atom) :: Path.t
-  def db_path(name) do
+  defp db_path(name) do
     state_dir = Application.get_env(@app, :state_dir)
     Path.join(state_dir, "#{name}.db")
   end
 
   @doc "Get path to flag file for name"
   @spec flag_path(atom) :: Path.t
-  def flag_path(name) do
+  defp flag_path(name) do
     state_dir = Application.get_env(@app, :state_dir)
     Path.join(state_dir, "#{name}.flag")
   end
@@ -257,7 +260,7 @@ defmodule FileConfig.Handler.CsvDb do
     end)
   end
 
-  def commit(db) do
+  defp commit(db) do
     try do
       :ok = :esqlite3.exec("commit;", db)
     catch
