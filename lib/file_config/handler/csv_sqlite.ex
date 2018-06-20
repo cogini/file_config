@@ -118,7 +118,7 @@ defmodule FileConfig.Handler.CsvSqlite do
   end
 
   @spec parse_file_incremental(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
-  defp parse_file_incremental(path, _tid, config) do
+  def parse_file_incremental(path, _tid, config) do
     {k, v} = config[:csv_fields] || {1, 2}
     commit_cycle = config[:commit_cycle] || 1000
     parser_processes = config[:parser_processes] || :erlang.system_info(:schedulers_online)
@@ -169,7 +169,7 @@ defmodule FileConfig.Handler.CsvSqlite do
   end
 
   @spec parse_file2(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
-  defp parse_file2(path, _tid, config) do
+  def parse_file2(path, _tid, config) do
     {k, v} = config[:csv_fields] || {1, 2}
     commit_cycle = config[:commit_cycle] || 100
     parser_processes = config[:parser_processes] || :erlang.system_info(:schedulers_online)
@@ -231,14 +231,14 @@ defmodule FileConfig.Handler.CsvSqlite do
     :ok
   end
 
-  @doc "Get path to db for name"
+  # @doc "Get path to db for name"
   @spec db_path(atom) :: Path.t
   defp db_path(name) do
     state_dir = Application.get_env(@app, :state_dir)
     Path.join(state_dir, "#{name}.db")
   end
 
-  @doc "Get path to flag file for name"
+  # @doc "Get path to flag file for name"
   @spec flag_path(atom) :: Path.t
   defp flag_path(name) do
     state_dir = Application.get_env(@app, :state_dir)
@@ -263,16 +263,16 @@ defmodule FileConfig.Handler.CsvSqlite do
     end)
   end
 
-  defp commit(db) do
-    try do
-      :ok = :esqlite3.exec("commit;", db)
-    catch
-      {:error, :timeout, _ref} ->
-        Lager.warning("sqlite3 timeout")
-        commit(db)
-      error ->
-        Lager.warning("sqlite3 error #{inspect error}")
-    end
-  end
+  # defp commit(db) do
+  #   try do
+  #     :ok = :esqlite3.exec("commit;", db)
+  #   catch
+  #     {:error, :timeout, _ref} ->
+  #       Lager.warning("sqlite3 timeout")
+  #       commit(db)
+  #     error ->
+  #       Lager.warning("sqlite3 error #{inspect error}")
+  #   end
+  # end
 
 end
