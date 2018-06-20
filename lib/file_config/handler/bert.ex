@@ -42,9 +42,9 @@ defmodule FileConfig.Handler.Bert do
   end
 
   # @impl true
-  @spec insert_records(:ets.tab, tuple() | [tuple()]) :: true
-  def insert_records(tid, records) do
-    :ets.insert(tid, records)
+  @spec insert_records(Loader.table_state, tuple | [tuple]) :: true
+  def insert_records(table, records) do
+    :ets.insert(table.id, records)
   end
 
   # Internal functions
@@ -59,7 +59,7 @@ defmodule FileConfig.Handler.Bert do
               |> parse_data(config)
               # |> validate()
 
-    true = insert_records(tid, records)
+    true = :ets.insert(tid, records)
     {:ok, length(records)}
   end
 

@@ -31,18 +31,25 @@ defmodule FileConfig.Handler.Csv do
   def load_update(name, update, tid) do
     # Assume updated files contain all records
     {path, _state} = hd(update.files)
+    config = update.config
 
     Lager.debug("Loading #{name} csv #{path}")
-    {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, update.config])
+    {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
     Lager.notice("Loaded #{name} csv #{path} #{rec} rec #{time / 1_000_000} sec")
 
-    %{name: name, id: tid, mod: update.mod, handler: __MODULE__}
+    %{
+      name: name,
+      id: tid,
+      mod: update.mod,
+      handler: __MODULE__,
+      data_parser: config[:data_parser]
+    }
   end
 
   # @impl true
-  @spec insert_records(:ets.tab, tuple() | [tuple()]) :: true
-  def insert_records(tid, records) do
-    :ets.insert(tid, records)
+  @spec insert_records(Loader.table_state, tuple | [tuple]) :: true
+  def insert_records(table, records) do
+    :ets.insert(table.id, records)
   end
 
   # Internal functions
@@ -64,7 +71,7 @@ defmodule FileConfig.Handler.Csv do
         else
           data_parser.parse_value(name, key, Lib.rnth(v, line, len))
         end
-        insert_records(tid, {key, value})
+        true = :ets.insert(tid, {key, value})
         acc + 1
       ({:shard, _shard}, acc) -> # Called before parsing shard
         acc

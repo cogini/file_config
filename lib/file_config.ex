@@ -38,9 +38,10 @@ defmodule FileConfig do
   def insert(name, records) do
     case table_info(name) do
       :undefined ->
+        Lager.warning("Unkown table #{name}")
         true
-      %{handler: handler, id: tid} ->
-        handler.insert_records(tid, records)
+      %{handler: handler} = table_state ->
+        handler.insert_records(table_state, records)
     end
   end
 
@@ -104,7 +105,7 @@ defmodule FileConfig do
 
   # Get all data for name from index
   @spec table_info(name) :: Loader.table_state | :undefined
-  defp table_info(name) do
+  def table_info(name) do
     try do
       case :ets.lookup(@table, name) do
         [{^name, tab}] -> tab

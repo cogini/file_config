@@ -54,14 +54,21 @@ defmodule FileConfig.Handler.CsvSqlite do
       Lager.notice("Loaded #{name} db #{path} up to date")
     end
 
-    %{name: name, id: tid, mod: update.mod, handler: __MODULE__, db_path: to_charlist(db_path)}
+    %{
+      name: name,
+      id: tid,
+      mod: update.mod,
+      handler: __MODULE__,
+      db_path: to_charlist(db_path)
+    }
   end
 
   # @impl true
-  def insert_records(records, db_path, commit_cycle) do
-    chunks = Enum.chunk_every(records, commit_cycle)
+  @spec insert_records(Loader.table_state, [tuple]) :: true
+  def insert_records(table, records) do
+    chunks = Enum.chunk_every(records, table.commit_cycle)
     for chunk <- chunks do
-      {:ok, db} = Sqlitex.open(db_path)
+      {:ok, db} = Sqlitex.open(table.db_path)
       {:ok, statement} = :esqlite3.prepare("INSERT OR REPLACE INTO kv_data (key, value) VALUES(?1, ?2);", db)
       :ok = :esqlite3.exec("begin;", db)
       for {key, value} <- chunk, do: insert_row(statement, [key, value])
@@ -168,47 +175,47 @@ defmodule FileConfig.Handler.CsvSqlite do
     {:ok, num_records}
   end
 
-  @spec parse_file2(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
-  def parse_file2(path, _tid, config) do
-    {k, v} = config[:csv_fields] || {1, 2}
-    commit_cycle = config[:commit_cycle] || 100
-    parser_processes = config[:parser_processes] || :erlang.system_info(:schedulers_online)
-    db_path = db_path(config.name)
-
-    evt = fn
-      ({:line, line}, acc) -> # Called for each line
-        len = length(line)
-        key = Lib.rnth(k, line, len)
-        value = Lib.rnth(v, line, len)
-        [{key, value} | acc]
-      ({:shard, _shard}, acc) -> # Called before parsing shard
-        acc
-      (:eof, acc) -> # Called after parsing shard
-        acc
-    end
-
-    # {_tread, {:ok, bin}} = :timer.tc(File, :read, [path])
-    # {tparse, r} = :timer.tc(:file_config_csv2, :pparse, [bin, :erlang.system_info(:schedulers_online), evt, 0])
-
-    # {:ok, bin} = File.read(path)
-    # r = :file_config_csv2.pparse(bin, parser_processes, evt, [])
-    # records = List.flatten(r)
-    # num_records = length(records)
-    {tread, {:ok, bin}} = :timer.tc(File, :read, [path])
-    Lager.debug("#{path} read time: #{tread / 1_000_000}")
-    {tparse, r} = :timer.tc(:file_config_csv2, :pparse, [bin, parser_processes, evt, []])
-    Lager.debug("#{path} parse time: #{tparse / 1_000_000}")
-    # {tflatten, records} = :timer.tc(List, :flatten, [r])
-    # Lager.debug("tflatten: #{tflatten / 1000000}")
-    # {tlength, num_records} = :timer.tc(&length/1, [records])
-    # Lager.debug("tlength: #{tlength / 1000000}")
-    records = List.flatten(r)
-    num_records = length(records)
-
-    {time, _r} = :timer.tc(&insert_records/3, [records, db_path, commit_cycle])
-    Lager.debug("#{path} insert time #{time / 1_000_000}")
-    {:ok, num_records}
-  end
+  # @spec parse_file2(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
+  # def parse_file2(path, _tid, config) do
+  #   {k, v} = config[:csv_fields] || {1, 2}
+  #   commit_cycle = config[:commit_cycle] || 100
+  #   parser_processes = config[:parser_processes] || :erlang.system_info(:schedulers_online)
+  #   db_path = db_path(config.name)
+  #
+  #   evt = fn
+  #     ({:line, line}, acc) -> # Called for each line
+  #       len = length(line)
+  #       key = Lib.rnth(k, line, len)
+  #       value = Lib.rnth(v, line, len)
+  #       [{key, value} | acc]
+  #     ({:shard, _shard}, acc) -> # Called before parsing shard
+  #       acc
+  #     (:eof, acc) -> # Called after parsing shard
+  #       acc
+  #   end
+  #
+  #   # {_tread, {:ok, bin}} = :timer.tc(File, :read, [path])
+  #   # {tparse, r} = :timer.tc(:file_config_csv2, :pparse, [bin, :erlang.system_info(:schedulers_online), evt, 0])
+  #
+  #   # {:ok, bin} = File.read(path)
+  #   # r = :file_config_csv2.pparse(bin, parser_processes, evt, [])
+  #   # records = List.flatten(r)
+  #   # num_records = length(records)
+  #   {tread, {:ok, bin}} = :timer.tc(File, :read, [path])
+  #   Lager.debug("#{path} read time: #{tread / 1_000_000}")
+  #   {tparse, r} = :timer.tc(:file_config_csv2, :pparse, [bin, parser_processes, evt, []])
+  #   Lager.debug("#{path} parse time: #{tparse / 1_000_000}")
+  #   # {tflatten, records} = :timer.tc(List, :flatten, [r])
+  #   # Lager.debug("tflatten: #{tflatten / 1000000}")
+  #   # {tlength, num_records} = :timer.tc(&length/1, [records])
+  #   # Lager.debug("tlength: #{tlength / 1000000}")
+  #   records = List.flatten(r)
+  #   num_records = length(records)
+  #
+  #   {time, _r} = :timer.tc(&insert_records/3, [records, db_path, commit_cycle])
+  #   Lager.debug("#{path} insert time #{time / 1_000_000}")
+  #   {:ok, num_records}
+  # end
 
   defp insert_row(statement, params), do: insert_row(statement, params, :first, 1)
 

@@ -39,9 +39,9 @@ defmodule FileConfig.Handler.Dat do
   end
 
   # @impl true
-  @spec insert_records(:ets.tab, tuple() | [tuple()]) :: true
-  def insert_records(tid, records) do
-    :ets.insert(tid, records)
+  @spec insert_records(Loader.table_state, tuple | [tuple]) :: true
+  def insert_records(table, records) do
+    :ets.insert(table.id, records)
   end
 
   @spec parse_file(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}

@@ -58,20 +58,26 @@ defmodule FileConfig.Handler.CsvRocksdb do
       Lager.notice("Loaded #{name} rocksdb #{db_path} up to date")
     end
 
-    %{name: name, id: tid, mod: update.mod, handler: __MODULE__, db_path: to_charlist(db_path)}
+    %{
+      name: name,
+      id: tid,
+      mod: update.mod,
+      handler: __MODULE__,
+      data_parser: config[:data_parser],
+      db_path: to_charlist(db_path),
+      chunk_size: chunk_size
+    }
   end
 
   # @impl true
-  @spec insert_records(:ets.tab, atom, [tuple()]) :: true
-  def insert_records(tab, name, records) do
-    chunk_size = 100
-
-    {:ok, db} = :rocksdb.open(to_charlist(db_path(name)), create_if_missing: false)
+  @spec insert_records(Loader.table_state, [tuple]) :: true
+  def insert_records(table, records) do
+    {:ok, db} = :rocksdb.open(table.db_path, create_if_missing: false)
 
     records
     |> Enum.sort
-    |> Enum.chunk_every(chunk_size)
-    |> Enum.map(&insert_chunk(&1, tab, db))
+    |> Enum.chunk_every(table.chunk_size)
+    |> Enum.map(&insert_chunk(&1, table.id, db))
 
     :ok = :rocksdb.close(db)
   end
