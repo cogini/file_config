@@ -60,8 +60,8 @@ defmodule FileConfig.Handler.Dat do
           :nomatch ->
             split = :re.split(line, "[\.|\n]", [:trim, {:return, :binary}])
             key = :lists.reverse(split)
-            # TODO: convert to Jason
-            value = :jsx.encode(Enum.join(split, "."))
+            # value = :jsx.encode(Enum.join(split, "."))
+            value = Jason.encode(Enum.join(split, "."))
             :ets.insert(tid, [{key, value}])
             decode(fh, tid, count + 1)
           _ ->
