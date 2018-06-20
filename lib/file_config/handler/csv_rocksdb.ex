@@ -143,7 +143,7 @@ defmodule FileConfig.Handler.CsvRocksdb do
         #     Lager.warning("Error reading path #{path}: #{reason}")
         #     true
         # end
-      {:error, :noent} ->
+      {:error, :enoent} ->
         true
     end
   end
