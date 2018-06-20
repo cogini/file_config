@@ -10,11 +10,21 @@ defmodule FileConfig.Handler.Bert do
 
   # @impl true
   @spec lookup(Loader.table_state, term) :: term
-  def lookup(%{id: tid, name: name, data_parser: data_parser}, key) do
+  def lookup(%{id: tid, name: name, lazy_parse: true, data_parser: data_parser}, key) do
     case :ets.lookup(tid, key) do
       [] -> :undefined
       [{^key, value}] ->
-        {:ok, data_parser.parse_value(name, key, value)}
+        parsed_value = data_parser.parse_value(name, key, value)
+        # Cache parsed value
+        true = :ets.insert(tid, [{key, parsed_value}])
+        {:ok, parsed_value}
+    end
+  end
+  def lookup(%{id: tid}, key) do
+    case :ets.lookup(tid, key) do
+      [] -> :undefined
+      [{^key, value}] ->
+        {:ok, value}
     end
   end
 
@@ -44,10 +54,11 @@ defmodule FileConfig.Handler.Bert do
     {:ok, terms} = decode(bin)
 
     {_name, records} = terms
-                      |> List.flatten()
-                      |> Enum.sort() # TODO: why are we sorting?
-                      |> transform(config)
-                      # |> validate()
+              |> List.flatten()
+              |> Enum.sort() # TODO: why are we sorting?
+              |> parse_data(config)
+              # |> validate()
+
     true = insert_records(tid, records)
     {:ok, length(records)}
   end
@@ -63,10 +74,19 @@ defmodule FileConfig.Handler.Bert do
   end
 
   # @doc "Optionally apply a transformation function to data"
-  @spec transform([nrecs] | nrecs, map) :: nrecs
-  defp transform([nrecs], config), do: transform(nrecs, config)
-  defp transform({name, records}, %{transform_fun: {m, f, a}}), do: apply(m, f, [{name, records}] ++ a)
-  defp transform({name, records}, _config), do: {name, records}
+  # @spec transform([nrecs] | nrecs, map) :: nrecs
+  # defp transform([nrecs], config), do: transform(nrecs, config)
+  # defp transform({name, records}, %{transform_fun: {m, f, a}}), do: apply(m, f, [{name, records}] ++ a)
+  # defp transform({name, records}, _config), do: {name, records}
+
+  @spec parse_data(list({atom, list}) | {atom, list}, map) :: list
+  defp parse_data([nrecs], config), do: parse_data(nrecs, config)
+  defp parse_data({_name, _recs} = nrecs, %{lazy_parse: true}), do: nrecs
+  defp parse_data({_name, _recs} = nrecs, %{data_parser: nil}), do: nrecs
+  defp parse_data({_name, _recs} = nrecs, %{data_parser: FileConfig.DataParser.Noop}), do: nrecs
+  defp parse_data({name, recs}, %{data_parser: data_parser}) do
+    {name, Enum.map(recs, &(data_parser.parse_value(&1)))}
+  end
 
   # Validate data to make sure it matches the format
   # [{Namespace::atom(), [{Key, Val}]}]

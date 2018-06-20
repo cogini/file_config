@@ -8,11 +8,21 @@ defmodule FileConfig.Handler.Csv do
 
   # @impl true
   @spec lookup(Loader.table_state, term) :: term
-  def lookup(%{id: tid, name: name, data_parser: data_parser}, key) do
+  def lookup(%{id: tid, name: name, lazy_parse: true, data_parser: data_parser}, key) do
     case :ets.lookup(tid, key) do
       [] -> :undefined
       [{^key, value}] ->
-        {:ok, data_parser.parse_value(name, key, value)}
+        parsed_value = data_parser.parse_value(name, key, value)
+        # Cache parsed value
+        true = :ets.insert(tid, [{key, parsed_value}])
+        {:ok, parsed_value}
+    end
+  end
+  def lookup(%{id: tid}, key) do
+    case :ets.lookup(tid, key) do
+      [] -> :undefined
+      [{^key, value}] ->
+        {:ok, value}
     end
   end
 
@@ -41,12 +51,19 @@ defmodule FileConfig.Handler.Csv do
   def parse_file(path, tid, config) do
     {k, v} = config[:csv_fields] || {1, 2}
     parser_processes = config[:parser_processes] || :erlang.system_info(:schedulers_online)
+    lazy_parse = config[:lazy_parse]
+    data_parser = config[:data_parser]
+    name  = config[:name]
 
     evt = fn
       ({:line, line}, acc) -> # Called for each line
         len = length(line)
         key = Lib.rnth(k, line, len)
-        value = Lib.rnth(v, line, len)
+        value = if lazy_parse do
+          Lib.rnth(v, line, len)
+        else
+          data_parser.parse_value(name, key, Lib.rnth(v, line, len))
+        end
         insert_records(tid, {key, value})
         acc + 1
       ({:shard, _shard}, acc) -> # Called before parsing shard

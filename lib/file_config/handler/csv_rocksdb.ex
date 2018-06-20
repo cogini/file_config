@@ -24,7 +24,10 @@ defmodule FileConfig.Handler.CsvRocksdb do
         {:ok, db} = :rocksdb.open(db_path, create_if_missing: false)
         case :rocksdb.get(db, key, []) do
           {:ok, value} ->
-            {:ok, data_parser.parse_value(name, key, value)}
+            parsed_value = data_parser.parse_value(name, key, value)
+            # Cache parsed value
+            true = :ets.insert(tid, [{key, parsed_value}])
+            {:ok, parsed_value}
           :not_found ->
             # Cache not found result
             true = :ets.insert(tid, [{key, :undefined}])

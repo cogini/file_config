@@ -26,7 +26,10 @@ defmodule FileConfig.Handler.CsvSqlite do
         end)
         case results do
           [value] ->
-            {:ok, data_parser.parse_value(name, key, value)}
+            parsed_value = data_parser.parse_value(name, key, value)
+            # Cache parsed value
+            true = :ets.insert(tid, [{key, parsed_value}])
+            {:ok, parsed_value}
           [] ->
             # Cache not found result
             true = :ets.insert(tid, [{key, :undefined}])
