@@ -2,7 +2,7 @@ defmodule FileConfig.Handler.CsvRocksdb do
   @moduledoc "Handler for CSV files with RocksDB backend"
   @app :file_config
 
-  NimbleCSV.define(FileConfig.Handler.CsvRocksdb.Parser, separator: "\t", escape: "\0", headers: false)
+  NimbleCSV.define(FileConfig.Handler.CsvRocksdb.Parser, separator: "\t", escape: "\0", header: false)
 
   alias FileConfig.Handler.CsvRocksdb.Parser
 
@@ -54,7 +54,7 @@ defmodule FileConfig.Handler.CsvRocksdb do
     if update_db?(db_path, update.mod) do
       Lager.debug("Loading #{name} rocksdb #{path} #{db_path}")
       {time, {:ok, rec}} = :timer.tc(&parse_file/3, [path, db_path, chunk_size])
-      Lager.notice("Loaded #{name} csv #{path} #{rec} rec #{time / 1_000_000} sec")
+      Lager.notice("Loaded #{name} rocksdb #{path} #{rec} rec #{time / 1_000_000} sec")
     else
       Lager.notice("Loaded #{name} rocksdb #{db_path} up to date")
     end

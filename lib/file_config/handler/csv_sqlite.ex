@@ -2,7 +2,7 @@ defmodule FileConfig.Handler.CsvSqlite do
   @moduledoc "Handler for CSV files with sqlite backend"
   @app :file_config
 
-  NimbleCSV.define(FileConfig.Handler.CsvSqlite.Parser, separator: "\t", escape: "\0", headers: false)
+  NimbleCSV.define(FileConfig.Handler.CsvSqlite.Parser, separator: "\t", escape: "\0", header: false)
 
   alias FileConfig.Handler.CsvSqlite.Parser
 
