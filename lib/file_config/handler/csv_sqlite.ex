@@ -2,7 +2,7 @@ defmodule FileConfig.Handler.CsvSqlite do
   @moduledoc "Handler for CSV files with sqlite backend"
   @app :file_config
 
-  NimbleCSV.define(FileConfig.Handler.CsvSqlite.Parser, separator: "\t", escape: "\0", header: false)
+  NimbleCSV.define(FileConfig.Handler.CsvSqlite.Parser, separator: "\t", escape: "\0")
 
   alias FileConfig.Handler.CsvSqlite.Parser
 
@@ -106,7 +106,7 @@ defmodule FileConfig.Handler.CsvSqlite do
 
     stream = path
     |> File.stream!(read_ahead: 100_000)
-    |> Parser.parse_stream
+    |> Parser.parse_stream(headers: false)
     |> Stream.map(&(insert_row(statement, fetch_fn.(&1))))
     results = Enum.to_list(stream)
 

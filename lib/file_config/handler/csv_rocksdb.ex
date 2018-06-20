@@ -2,7 +2,7 @@ defmodule FileConfig.Handler.CsvRocksdb do
   @moduledoc "Handler for CSV files with RocksDB backend"
   @app :file_config
 
-  NimbleCSV.define(FileConfig.Handler.CsvRocksdb.Parser, separator: "\t", escape: "\0", header: false)
+  NimbleCSV.define(FileConfig.Handler.CsvRocksdb.Parser, separator: "\t", escape: "\0")
 
   alias FileConfig.Handler.CsvRocksdb.Parser
 
@@ -90,7 +90,7 @@ defmodule FileConfig.Handler.CsvRocksdb do
 
     stream = path
     |> File.stream!(read_ahead: 100_000)
-    |> Parser.parse_stream
+    |> Parser.parse_stream(headers: false)
     |> Stream.chunk_every(chunk_size)
     |> Stream.map(&write_chunk(&1, db))
 
