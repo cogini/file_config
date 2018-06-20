@@ -22,7 +22,7 @@ defmodule FileConfig.Handler.CsvRocksdb do
       [] ->
         # TODO: somehow reuse db handle
         {:ok, db} = :rocksdb.open(db_path, create_if_missing: false)
-        case :rocksdb.get(db, key, []) do
+        return = case :rocksdb.get(db, key, []) do
           {:ok, value} ->
             parsed_value = data_parser.parse_value(name, key, value)
             # Cache parsed value
@@ -37,6 +37,7 @@ defmodule FileConfig.Handler.CsvRocksdb do
             :undefined
         end
         :ok = :rocksdb.close(db)
+        return
     end
   end
 
