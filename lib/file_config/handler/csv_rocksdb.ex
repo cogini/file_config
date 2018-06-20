@@ -9,7 +9,6 @@ defmodule FileConfig.Handler.CsvRocksdb do
   require Lager
 
   alias FileConfig.Loader
-  alias FileConfig.Lib
 
   # @impl true
   @spec lookup(Loader.table_state, term) :: term
@@ -21,6 +20,7 @@ defmodule FileConfig.Handler.CsvRocksdb do
       [{^key, value}] -> # Found result
         {:ok, value}
       [] ->
+        # TODO: somehow reuse db handle
         {:ok, db} = :rocksdb.open(db_path, create_if_missing: false)
         case :rocksdb.get(db, key, []) do
           {:ok, value} ->
