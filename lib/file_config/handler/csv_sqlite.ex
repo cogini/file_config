@@ -64,7 +64,7 @@ defmodule FileConfig.Handler.CsvSqlite do
   end
 
   # @impl true
-  @spec insert_records(Loader.table_state, [tuple]) :: true
+  @spec insert_records(Loader.table_state, [tuple]) :: :ok
   def insert_records(table, records) do
     chunks = Enum.chunk_every(records, table.commit_cycle)
     for chunk <- chunks do

@@ -71,14 +71,14 @@ defmodule FileConfig.Handler.CsvRocksdb do
   end
 
   # @impl true
-  @spec insert_records(Loader.table_state, [tuple]) :: true
+  @spec insert_records(Loader.table_state, [tuple]) :: :ok
   def insert_records(table, records) do
     {:ok, db} = :rocksdb.open(table.db_path, create_if_missing: false)
 
     records
     |> Enum.sort
     |> Enum.chunk_every(table.chunk_size)
-    |> Enum.map(&insert_chunk(&1, table.id, db))
+    |> Enum.map(&insert_chunk(&1, table, db))
 
     :ok = :rocksdb.close(db)
   end
@@ -115,17 +115,19 @@ defmodule FileConfig.Handler.CsvRocksdb do
     Path.join(state_dir, to_string(name))
   end
 
+  @spec write_chunk(list(tuple), :rocksdb.db_handle) :: {non_neg_integer, non_neg_integer}
   def write_chunk(chunk, db) do
     batch = for [_id, key, value] <- chunk, do: {:put, key, value}
-    # :rocksdb.write(db, batch, sync: true)
+    # :ok = :rocksdb.write(db, batch, sync: true)
     {duration, :ok} = :timer.tc(:rocksdb, :write, [db, batch, []])
     {length(batch), duration}
   end
 
+  @spec insert_chunk(list(tuple), :ets.tab, :rocksdb.db_handle) :: {non_neg_integer, non_neg_integer}
   defp insert_chunk(chunk, tab, db) do
     batch = for {key, value} <- chunk, do: {:put, key, value}
     {duration, :ok} = :timer.tc(:rocksdb, :write, [db, batch, []])
-    :ok = :ets.insert(tab, chunk)
+    true = :ets.insert(tab, chunk)
 
     {length(batch), duration}
   end

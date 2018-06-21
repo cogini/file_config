@@ -48,8 +48,8 @@ defmodule FileConfig.Handler.Bert do
   end
 
   # Internal functions
-  @spec parse_file(Path.t, :ets.tid, map) :: {:ok, non_neg_integer}
-  def parse_file(path, tid, config) do
+  @spec parse_file(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
+  def parse_file(path, tab, config) do
     {:ok, bin} = File.read(path)
     {:ok, terms} = decode(bin)
 
@@ -59,7 +59,7 @@ defmodule FileConfig.Handler.Bert do
               |> parse_data(config)
               # |> validate()
 
-    true = :ets.insert(tid, records)
+    true = :ets.insert(tab, records)
     {:ok, length(records)}
   end
 
@@ -79,11 +79,11 @@ defmodule FileConfig.Handler.Bert do
   # defp transform({name, records}, %{transform_fun: {m, f, a}}), do: apply(m, f, [{name, records}] ++ a)
   # defp transform({name, records}, _config), do: {name, records}
 
-  @spec parse_data(list({atom, list}) | {atom, list}, map) :: list
+  @spec parse_data(list({atom, list}) | {atom, list}, map) :: {atom, list}
   defp parse_data([nrecs], config), do: parse_data(nrecs, config)
-  defp parse_data({_name, _recs} = nrecs, %{lazy_parse: true}), do: nrecs
-  defp parse_data({_name, _recs} = nrecs, %{data_parser: nil}), do: nrecs
-  defp parse_data({_name, _recs} = nrecs, %{data_parser: FileConfig.DataParser.Noop}), do: nrecs
+  defp parse_data(nrecs, %{lazy_parse: true}), do: nrecs
+  defp parse_data(nrecs, %{data_parser: nil}), do: nrecs
+  defp parse_data(nrecs, %{data_parser: FileConfig.DataParser.Noop}), do: nrecs
   defp parse_data({name, recs}, %{data_parser: data_parser}) do
     {name, Enum.map(recs, &(data_parser.parse_value(&1)))}
   end
