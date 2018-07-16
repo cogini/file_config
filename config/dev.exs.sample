@@ -12,6 +12,7 @@ config :file_config,
       # format: :csv, # csv | bert | dat, default to match extension
       # handler: name of module to handle update, default to match format
       # transform_fun: {:bert_utils, :bertconf_parse_binaries, []},
+      data_parser: FileConfig.DataParser.Json,
     },
     foo_config: %{
       file: "foo_config.bert",
@@ -19,7 +20,7 @@ config :file_config,
     foo_db: %{
       file: "foo_db.csv",
       csv_fields: {2, 3},
-      handler: FileConfig.Handler.CsvDb
+      data_parser: FileConfig.DataParser.Json,
     },
   ]
 

@@ -9,9 +9,9 @@ config :file_config,
       # file: name of file or regex
       file: "foo.csv",
       # name: name of table, defaults to key
-      # format: :csv, # csv | bert | dat, default to match extension
-      # handler: name of module to handle update, default to match format
-      # transform_fun: {:bert_utils, :bertconf_parse_binaries, []},
+      # format: :csv, # csv | bert | dat, default from extension
+      # handler: name of module to handle update, default from format
+      data_parser: FileConfig.DataParser.Json,
     },
     foo_config: %{
       file: "foo_config.bert",
@@ -19,7 +19,9 @@ config :file_config,
     foo_db: %{
       file: "foo_db.csv",
       csv_fields: {2, 3},
-      handler: FileConfig.Handler.CsvDb
+      data_parser: FileConfig.DataParser.Json,
+      handler: FileConfig.Handler.CsvRocksdb,
+      chunk_size: 1000,
     },
   ]
 
@@ -53,4 +55,3 @@ config :lager,
     ]
   ],
   colored: :true
-
