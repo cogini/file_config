@@ -1,4 +1,6 @@
 defmodule FileConfig.EventProducer do
+  @moduledoc "Notifiy interested parties when files are loaded"
+
   use GenStage
 
   @doc "Start the broadcaster"
