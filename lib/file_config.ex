@@ -1,7 +1,5 @@
 defmodule FileConfig do
-  @moduledoc """
-  FileConfig public API.
-  """
+  @moduledoc "Public API"
 
   require Lager
 
@@ -9,10 +7,7 @@ defmodule FileConfig do
   @match_limit 500
 
   @type name :: atom
-  @type version :: {:vsn, term}
-
-  # -opaque version() :: {vsn,term()}.
-  # -export_type([namespace/0, version/0]).
+  @opaque version :: {:vsn, term}
 
   # Public API
 
@@ -46,7 +41,7 @@ defmodule FileConfig do
   end
 
   @doc "Return all records in table"
-  @spec all(name, non_neg_integer) :: list(term)
+  @spec all(name, pos_integer) :: list(term)
   def all(name, match_limit) do
     loop_all({table(name), :"_", match_limit})
   end
@@ -65,9 +60,10 @@ defmodule FileConfig do
 
   @spec version(name, version) :: :current | :old
   def version(name, {:vsn, version}) do
-    case {table(name), version} do
-      {x, x} -> :current
-      _ -> :old
+    if table(name) == version do
+      :current
+    else
+      :old
     end
   end
 
@@ -76,7 +72,7 @@ defmodule FileConfig do
   # @typep match :: list(term)
   # @spec loop_all(args) :: [match]
   #     args :: {[match], :ets.continuation}
-  #           | {:ets.tid, :ets.match_pattern, non_neg_integer}
+  #           | {:ets.tid, :ets.match_pattern, pos_integer}
   #           | :"$end_of_table",
   # Collect results from ets all lookup
   defp loop_all(:"$end_of_table"), do: []
@@ -104,7 +100,7 @@ defmodule FileConfig do
   end
 
   # Get all data for name from index
-  @spec table_info(name) :: Loader.table_state | :undefined
+  @spec table_info(name) :: FileConfig.Loader.table_state | :undefined
   def table_info(name) do
     try do
       case :ets.lookup(@table, name) do
