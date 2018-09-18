@@ -31,7 +31,8 @@ defmodule FileConfig.Loader do
   end
 
   @spec handle_info(term, map) :: {:noreply, map}
-  def handle_info({:timeout, ref, :reload}, %{ref: ref, files: files, old_tables: old_old_tables} = state) do # TODO check ref matching
+  def handle_info({:timeout, ref, :reload}, state) do
+    %{ref: ^ref, files: files, old_tables: old_old_tables} = state # TODO check ref matching
     {old_tables, new_files} = check_files(files)
     delete_tables(old_old_tables)
 
