@@ -30,8 +30,7 @@ config :lager,
   crash_log_size: 10_485_760,
   crash_log_count: 5,
   handlers: [
-    # lager_console_backend: :notice,
-    lager_console_backend: :debug,
+    lager_console_backend: [level: :debug],
     lager_file_backend: [
       file: 'log/notice.log', level: :notice, size: 10_485_760, count: 10, formatter: :lager_default_formatter,
       formatter_config: [:date, ' ', :time, ' ', :color, '[', :severity, '] ', {:uuid, ''}, ' ', {:pid, ''},
