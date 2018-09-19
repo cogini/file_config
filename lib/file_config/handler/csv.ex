@@ -11,7 +11,7 @@ defmodule FileConfig.Handler.Csv do
   def lookup(%{id: tid, name: name, lazy_parse: true, data_parser: data_parser}, key) do
     case :ets.lookup(tid, key) do
       [] -> :undefined
-      [{^key, value}] ->
+      [{_key, value}] ->
         parsed_value = data_parser.parse_value(name, key, value)
         # Cache parsed value
         true = :ets.insert(tid, [{key, parsed_value}])
@@ -21,7 +21,7 @@ defmodule FileConfig.Handler.Csv do
   def lookup(%{id: tid}, key) do
     case :ets.lookup(tid, key) do
       [] -> :undefined
-      [{^key, value}] ->
+      [{_key, value}] ->
         {:ok, value}
     end
   end
