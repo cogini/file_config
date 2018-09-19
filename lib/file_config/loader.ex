@@ -1,6 +1,5 @@
 defmodule FileConfig.Loader do
   @moduledoc "Load files"
-  @app :file_config
   @extensions [".bert", ".csv", ".dat"]
 
   use GenServer
@@ -19,25 +18,29 @@ defmodule FileConfig.Loader do
     GenServer.start_link(__MODULE__, state, name: __MODULE__)
   end
 
-  def init(_args) do
+  def init(config) do
     Process.flag(:trap_exit, true) # Die gracefully
     __MODULE__ = :ets.new(__MODULE__, [:set, :public, :named_table, {:read_concurrency, true}])
 
-    {old_tables, new_files} = check_files(%{})
+    data_dirs = config[:data_dirs] || []
+    file_configs = process_file_configs(config[:files] || [])
+    check_delay = config[:check_delay] || 5000
 
+    {old_tables, new_files} = check_files(%{}, %{data_dirs: data_dirs, file_configs: file_configs})
     free_binary_memory()
-    {:ok, %{ref: :erlang.start_timer(check_delay(), self(), :reload),
-            old_tables: old_tables, files: new_files}}
+    {:ok, %{ref: :erlang.start_timer(check_delay, self(), :reload),
+      old_tables: old_tables, files: new_files,
+      file_configs: file_configs, data_dirs: data_dirs, check_delay: check_delay}}
   end
 
   @spec handle_info(term, map) :: {:noreply, map}
   def handle_info({:timeout, ref, :reload}, state) do
     %{ref: ^ref, files: files, old_tables: old_old_tables} = state # TODO check ref matching
-    {old_tables, new_files} = check_files(files)
+    {old_tables, new_files} = check_files(files, state)
     delete_tables(old_old_tables)
 
     free_binary_memory()
-    {:noreply, %{state | ref: :erlang.start_timer(check_delay(), self(), :reload),
+    {:noreply, %{state | ref: :erlang.start_timer(state.check_delay, self(), :reload),
       files: new_files, old_tables: old_tables}}
   end
   def handle_info(_event, state) do
@@ -47,26 +50,25 @@ defmodule FileConfig.Loader do
   # API
 
   @doc "Check for changes to configured files"
-  @spec check_files(files) :: {[:ets.tid], files}
-  def check_files(old_files) do
-    file_configs = get_file_configs()
-    data_dirs = data_dirs()
+  @spec check_files(files, map) :: {[:ets.tid], files}
+  def check_files(old_files, state) do
+    new_files = get_files(state.data_dirs, state.file_configs)
 
-    new_files = get_files(data_dirs, file_configs)
     changed_files = get_changed_files(new_files, old_files)
+    # for {name, value} <- changed_files do
+    #   Lager.debug("changed_file: #{name} #{inspect value}")
+    # end
 
     new_tables = process_changed_files(changed_files)
+    # for new_table <- new_tables do
+    #   Lager.debug("new_table: #{inspect new_table}")
+    # end
 
     old_tables = update_table_index(new_tables)
+
     notify_update(new_tables)
 
     {old_tables, new_files}
-  end
-
-  @doc "Get list of configured files"
-  @spec get_file_configs() :: list(file_config)
-  def get_file_configs do
-    process_file_configs(Application.get_env(@app, :files, []))
   end
 
   @doc "Process file configs to set defaults"
@@ -142,7 +144,7 @@ defmodule FileConfig.Loader do
       case Map.fetch(old_files, name) do
         :error -> # New file
           Map.put(acc, name, v)
-        {:ok, %{mod: prev_mod}} -> # Existing
+        {:ok, %{mod: prev_mod}} -> # Existing file
           # Get files that have been modified since last time
           mod_files = for {_p, %{mod: mod}} = f <- v.files, mod > prev_mod, do: f
           if length(mod_files) > 0 do
@@ -172,10 +174,10 @@ defmodule FileConfig.Loader do
       [] ->
         Lager.debug("Creating ETS table #{name} new")
         create_ets_table(config)
-      [{^name, %{id: tid, mod: m}}] when m == mod ->
+      [{_name, %{id: tid, mod: m}}] when m == mod ->
         Lager.debug("Using existing ETS table #{name}")
         tid
-      [{^name, %{}}] ->
+      [{_name, %{}}] ->
         Lager.debug("Creating ETS table #{name} update")
         create_ets_table(config)
     end
@@ -192,8 +194,16 @@ defmodule FileConfig.Loader do
   @spec update_table_index([table_state]) :: [:ets.tid]
   def update_table_index(new_tables) do
     # Get ids of tables which already exist and we are replacing
-    old_tables = for table <- new_tables,
-      [{_name, %{id: tid}}] <- :ets.lookup(__MODULE__, table.name), do: tid
+    old_tables = Enum.reduce(new_tables, [], fn(%{name: name}, acc) ->
+      case :ets.lookup(__MODULE__, name) do
+        [] ->
+          # Lager.debug("ETS new_table: #{name}")
+          acc
+        [{_name, %{id: tid}}] ->
+          # Lager.debug("ETS old_table: #{name} #{inspect tid}")
+          [{name, tid} | acc]
+      end
+    end)
 
     # Update index with ids of current tables
     table_tuples = for %{name: name} = table <- new_tables, do: {name, table}
@@ -207,15 +217,19 @@ defmodule FileConfig.Loader do
 
   @spec delete_tables(list(:ets.tid)) :: :ok
   def delete_tables(tables) do
-    Enum.each(tables, &(:ets.delete(&1)))
+    for {name, tid} <- tables do
+      Lager.debug("Deleting old ETS table: #{inspect name} #{inspect tid}")
+      :ets.delete(tid)
+    end
   end
 
   @doc "Notify subscribers about updates"
   @spec notify_update([map]) :: :ok
-  def notify_update(new_tables) do
-    Enum.each(new_tables, fn(%{name: name}) ->
+  def notify_update(tables) do
+    for %{name: name} <- tables do
+      # Lager.debug("notify_update: #{inspect name}")
       FileConfig.EventProducer.sync_notify({:load, name})
-    end)
+    end
   end
 
   @doc "Get format from extension"
@@ -231,19 +245,13 @@ defmodule FileConfig.Loader do
   def format_to_handler(:csv), do: FileConfig.Handler.Csv
   def format_to_handler(:dat), do: FileConfig.Handler.Dat
 
-  @spec check_delay() :: non_neg_integer()
-  defp check_delay(), do: Application.get_env(@app, :check_delay, 5000)
-
-  @spec data_dirs() :: [Path.t]
-  defp data_dirs(), do: Application.get_env(@app, :data_dirs, [])
-
   def list_index do
     :ets.foldl(fn({key, value}, acc) -> [{key, value} | acc] end, [], __MODULE__)
   end
 
   def free_binary_memory do
     {:binary_memory, binary_memory} = :recon.info(self(), :binary_memory)
-    if binary_memory > 500_000_000 do
+    if binary_memory > 50_000_000 do
       # Manually trigger garbage collection to clear refc binary memory
       Lager.debug("Forcing garbage collection")
       :erlang.garbage_collect(self())
