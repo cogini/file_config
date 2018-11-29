@@ -43,13 +43,13 @@ defmodule FileConfig do
   @doc "Return all records in table"
   @spec all(name, pos_integer) :: list(term)
   def all(name, match_limit) do
-    loop_all({table(name), :"_", match_limit})
+    loop_all({table(name), :_, match_limit})
   end
 
   @doc "Return all records in table, default match limit 500"
   @spec all(name) :: list(term)
   def all(name) do
-    loop_all({table(name), :"_", @match_limit})
+    loop_all({table(name), :_, @match_limit})
   end
 
   # The version is the table id, which should be swapped on
