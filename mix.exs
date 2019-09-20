@@ -33,7 +33,7 @@ defmodule FileConfig.Mixfile do
       {:dialyxir, "~> 0.5.1", only: [:dev, :test], runtime: false},
       {:exlager, github: "khia/exlager"},
       # {:esqlite, github: "mmzeeman/esqlite"},
-      {:gen_stage, "~> 0.12"},
+      {:gen_stage, "~> 0.14"},
       {:jason, "~> 1.0"},
       # {:jsx, github: "talentdeficit/jsx", override: true},
       # {:lager, github: "basho/lager", override: true},
@@ -42,7 +42,8 @@ defmodule FileConfig.Mixfile do
       {:nimble_csv, "~> 0.3"},
       {:recon, "~> 2.3"},
       # {:rocksdb, git: "https://gitlab.com/barrel-db/erlang-rocksdb.git"},
-      {:sqlitex, "~> 1.4"}
+      {:rocksdb, "~> 1.3"},
+      {:sqlitex, "~> 1.7"}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"},
     ]
