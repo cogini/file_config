@@ -21,8 +21,8 @@ defmodule FileConfig.Loader.Tab do
 
   # @type t :: %__MODULE__{
   #   name: atom,             # name of table
-  #   id: :ets.tid,           
-  #   timestamp: :calendar.datetime,  
+  #   id: :ets.tid,
+  #   timestamp: :calendar.datetime,
   #   type: :ets | :db,
   #   db_path: :file.filename_all
   # }
