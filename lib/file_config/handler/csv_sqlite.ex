@@ -3,7 +3,6 @@ defmodule FileConfig.Handler.CsvSqlite do
   @app :file_config
 
   NimbleCSV.define(FileConfig.Handler.CsvSqlite.Parser, separator: "\t", escape: "\0")
-
   alias FileConfig.Handler.CsvSqlite.Parser
 
   require Lager
@@ -13,23 +12,28 @@ defmodule FileConfig.Handler.CsvSqlite do
 
   # @impl true
   @spec lookup(Loader.table_state, term) :: term
-  def lookup(table, key) do
-    %{id: tid, name: name, db_path: db_path, data_parser: data_parser} = table
+  def lookup(%{id: tid, name: name, parser: parser, db_path: db_path} = state, key) do
+    parser_opts = state[:parser_opts] || []
     case :ets.lookup(tid, key) do
-      [{^key, :undefined}] -> # Cached "not found" result from db
-        :undefined;
-      [{^key, value}] -> # Found result
+      [{_key, :undefined}] -> # Cached "not found" result
+        :undefined
+      [{_key, value}] -> # Cached result
         {:ok, value}
       [] ->
         {:ok, results} = Sqlitex.with_db(db_path, fn(db) ->
           Sqlitex.query(db, "SELECT value FROM kv_data where key = $1", bind: [key], into: %{})
         end)
         case results do
-          [value] ->
-            parsed_value = data_parser.parse_value(name, key, value)
-            # Cache parsed value
-            true = :ets.insert(tid, [{key, parsed_value}])
-            {:ok, parsed_value}
+          [%{value: bin}] ->
+            case parser.decode(bin, parser_opts) do
+              {:ok, value} ->
+                # Cache parsed value
+                true = :ets.insert(tid, [{key, value}])
+                {:ok, value}
+              {:error, reason} ->
+                Lager.debug("Error parsing table #{name} key #{key}: #{inspect reason}")
+                {:ok, bin}
+            end
           [] ->
             # Cache not found result
             true = :ets.insert(tid, [{key, :undefined}])
@@ -43,39 +47,49 @@ defmodule FileConfig.Handler.CsvSqlite do
   def load_update(name, update, tid) do
     # Assume updated files contain all records
     {path, _state} = hd(update.files)
+    config = update.config
 
     db_path = db_path(name)
     if update_db?(File.stat(flag_path(name)), update.mod) do
       maybe_create_db(db_path)
       Lager.debug("Loading #{name} db #{path} #{db_path}")
-      {time, {:ok, rec}} = :timer.tc(&parse_file/3, [path, tid, update.config])
+      {time, {:ok, rec}} = :timer.tc(&parse_file/3, [path, tid, config])
       Lager.notice("Loaded #{name} db #{path} #{rec} rec #{time / 1_000_000} sec")
     else
       Lager.notice("Loaded #{name} db #{path} up to date")
     end
 
-    %{
+    Map.merge(%{
       name: name,
       id: tid,
       mod: update.mod,
       handler: __MODULE__,
       db_path: to_charlist(db_path)
-    }
+    }, Map.take(config, [:parser, :parser_opts, :commit_cycle]))
   end
 
   # @impl true
-  @spec insert_records(Loader.table_state, [tuple]) :: :ok
-  def insert_records(table, records) do
-    chunks = Enum.chunk_every(records, table.commit_cycle)
+  @spec insert_records(Loader.table_state, tuple | [tuple]) :: true
+  def insert_records(%{commit_cycle: commit_cycle} = state, records) do
+    chunks = Enum.chunk_every(records, commit_cycle)
     for chunk <- chunks do
-      {:ok, db} = Sqlitex.open(table.db_path)
+      {:ok, db} = Sqlitex.open(state.db_path)
       {:ok, statement} = :esqlite3.prepare("INSERT OR REPLACE INTO kv_data (key, value) VALUES(?1, ?2);", db)
       :ok = :esqlite3.exec("begin;", db)
       for {key, value} <- chunk, do: insert_row(statement, [key, value])
       :ok = :esqlite3.exec("commit;", db)
       :ok = :esqlite3.close(db)
     end
-    :ok
+    true
+  end
+  def insert_records(state, records) do
+    {:ok, db} = Sqlitex.open(state.db_path)
+    {:ok, statement} = :esqlite3.prepare("INSERT OR REPLACE INTO kv_data (key, value) VALUES(?1, ?2);", db)
+    :ok = :esqlite3.exec("begin;", db)
+    for {key, value} <- records, do: insert_row(statement, [key, value])
+    :ok = :esqlite3.exec("commit;", db)
+    :ok = :esqlite3.close(db)
+    true
   end
 
   # Internal functions
@@ -85,6 +99,7 @@ defmodule FileConfig.Handler.CsvSqlite do
   defp update_db?({:ok, %{mtime: mtime}}, mod) when mod > mtime, do: true
   defp update_db?({:ok, _stat}, _mod), do: false
 
+  # Create function which selects key and value fields from parsed CSV row
   defp make_fetch_fn(%{csv_fields: {key_field, value_field}}) do
     key_index = key_field - 1
     value_index = value_field - 1
@@ -105,9 +120,9 @@ defmodule FileConfig.Handler.CsvSqlite do
     start_time = :os.timestamp()
 
     stream = path
-    |> File.stream!(read_ahead: 100_000)
-    |> Parser.parse_stream(headers: false)
-    |> Stream.map(&(insert_row(statement, fetch_fn.(&1))))
+             |> File.stream!(read_ahead: 100_000)
+             |> Parser.parse_stream(headers: false)
+             |> Stream.map(&(insert_row(statement, fetch_fn.(&1))))
     results = Enum.to_list(stream)
 
     process_duration = :timer.now_diff(:os.timestamp(), start_time) / 1_000_000
@@ -127,7 +142,7 @@ defmodule FileConfig.Handler.CsvSqlite do
   @spec parse_file_incremental(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
   def parse_file_incremental(path, _tid, config) do
     {k, v} = config[:csv_fields] || {1, 2}
-    commit_cycle = config[:commit_cycle] || 1000
+    commit_cycle = config[:commit_cycle] || 10000
     parser_processes = config[:parser_processes] || :erlang.system_info(:schedulers_online)
 
     db_path = db_path(config.name)
@@ -174,48 +189,6 @@ defmodule FileConfig.Handler.CsvSqlite do
     num_records = Enum.reduce(r, 0, fn(x, a) -> a + x.record_num end)
     {:ok, num_records}
   end
-
-  # @spec parse_file2(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
-  # def parse_file2(path, _tid, config) do
-  #   {k, v} = config[:csv_fields] || {1, 2}
-  #   commit_cycle = config[:commit_cycle] || 100
-  #   parser_processes = config[:parser_processes] || :erlang.system_info(:schedulers_online)
-  #   db_path = db_path(config.name)
-  #
-  #   evt = fn
-  #     ({:line, line}, acc) -> # Called for each line
-  #       len = length(line)
-  #       key = Lib.rnth(k, line, len)
-  #       value = Lib.rnth(v, line, len)
-  #       [{key, value} | acc]
-  #     ({:shard, _shard}, acc) -> # Called before parsing shard
-  #       acc
-  #     (:eof, acc) -> # Called after parsing shard
-  #       acc
-  #   end
-  #
-  #   # {_tread, {:ok, bin}} = :timer.tc(File, :read, [path])
-  #   # {tparse, r} = :timer.tc(:file_config_csv2, :pparse, [bin, :erlang.system_info(:schedulers_online), evt, 0])
-  #
-  #   # {:ok, bin} = File.read(path)
-  #   # r = :file_config_csv2.pparse(bin, parser_processes, evt, [])
-  #   # records = List.flatten(r)
-  #   # num_records = length(records)
-  #   {tread, {:ok, bin}} = :timer.tc(File, :read, [path])
-  #   Lager.debug("#{path} read time: #{tread / 1_000_000}")
-  #   {tparse, r} = :timer.tc(:file_config_csv2, :pparse, [bin, parser_processes, evt, []])
-  #   Lager.debug("#{path} parse time: #{tparse / 1_000_000}")
-  #   # {tflatten, records} = :timer.tc(List, :flatten, [r])
-  #   # Lager.debug("tflatten: #{tflatten / 1000000}")
-  #   # {tlength, num_records} = :timer.tc(&length/1, [records])
-  #   # Lager.debug("tlength: #{tlength / 1000000}")
-  #   records = List.flatten(r)
-  #   num_records = length(records)
-  #
-  #   {time, _r} = :timer.tc(&insert_records/3, [records, db_path, commit_cycle])
-  #   Lager.debug("#{path} insert time #{time / 1_000_000}")
-  #   {:ok, num_records}
-  # end
 
   defp insert_row(statement, params), do: insert_row(statement, params, :first, 1)
 
