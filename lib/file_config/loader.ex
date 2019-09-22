@@ -211,12 +211,13 @@ defmodule FileConfig.Loader do
     old_tables
   end
 
-  @spec delete_tables(list(:ets.tid)) :: :ok
+  @spec delete_tables(list(:ets.tab)) :: :ok
   def delete_tables(tables) do
     for {name, tid} <- tables do
       Lager.debug("Deleting old ETS table: #{inspect name} #{inspect tid}")
       :ets.delete(tid)
     end
+    :ok
   end
 
   @doc "Notify subscribers about updates"
@@ -226,6 +227,7 @@ defmodule FileConfig.Loader do
       # Lager.debug("notify_update: #{inspect name}")
       FileConfig.EventProducer.sync_notify({:load, name})
     end
+    :ok
   end
 
   @doc "Get format from extension"

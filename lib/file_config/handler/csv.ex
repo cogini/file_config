@@ -52,9 +52,9 @@ defmodule FileConfig.Handler.Csv do
   end
 
   # @impl true
-  @spec insert_records(Loader.table_state, tuple | [tuple]) :: true
-  def insert_records(table, records) do
-    :ets.insert(table.id, records)
+  @spec insert_records(Loader.table_state, {term, term} | [{term, term}]) :: true
+  def insert_records(state, records) do
+    :ets.insert(state.id, records)
   end
 
   # Internal functions

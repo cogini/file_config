@@ -43,7 +43,7 @@ defmodule FileConfig.Handler.CsvSqlite do
   end
 
   # @impl true
-  @spec load_update(Loader.name, Loader.update, :ets.tid) :: Loader.table_state
+  @spec load_update(Loader.name, Loader.update, :ets.tab) :: Loader.table_state
   def load_update(name, update, tid) do
     # Assume updated files contain all records
     {path, _state} = hd(update.files)
@@ -69,7 +69,7 @@ defmodule FileConfig.Handler.CsvSqlite do
   end
 
   # @impl true
-  @spec insert_records(Loader.table_state, tuple | [tuple]) :: true
+  @spec insert_records(Loader.table_state, {term, term} | [{term, term}]) :: true
   def insert_records(%{commit_cycle: commit_cycle} = state, records) do
     chunks = Enum.chunk_every(records, commit_cycle)
     for chunk <- chunks do

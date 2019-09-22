@@ -39,9 +39,9 @@ defmodule FileConfig.Handler.Dat do
   end
 
   # @impl true
-  @spec insert_records(Loader.table_state, tuple | [tuple]) :: true
-  def insert_records(table, records) do
-    :ets.insert(table.id, records)
+  @spec insert_records(Loader.table_state, {term, term} | [{term, term}]) :: true
+  def insert_records(state, records) do
+    :ets.insert(state.id, records)
   end
 
   @spec parse_file(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
@@ -52,7 +52,7 @@ defmodule FileConfig.Handler.Dat do
     {:ok, count}
   end
 
-  @spec decode(:file.io_device(), :ets.tid, non_neg_integer) :: {:ok, non_neg_integer}
+  @spec decode(:file.io_device(), :ets.tab, non_neg_integer) :: {:ok, non_neg_integer}
   defp decode(fh, tid, count) do
     case :file.read_line(fh) do
       {:ok, line} ->

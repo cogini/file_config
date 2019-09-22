@@ -33,6 +33,7 @@ defmodule FileConfig.Mixfile do
       {:dialyxir, "~> 0.5.1", only: [:dev, :test], runtime: false},
       {:exlager, github: "khia/exlager"},
       # {:esqlite, github: "mmzeeman/esqlite"},
+      {:esqlite, "~> 0.4.0"},
       {:gen_stage, "~> 0.14"},
       {:jason, "~> 1.0"},
       # {:jsx, github: "talentdeficit/jsx", override: true},
