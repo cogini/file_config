@@ -80,16 +80,12 @@ defmodule FileConfig.Loader do
       file = config.file
       format = config[:format] || ext_to_format(Path.extname(file))
       handler = config[:handler] || format_to_handler(format)
-      chunk_size = config[:chunk_size] || 1
-      data_parser = config[:data_parser] || FileConfig.DataParser.Noop
       regex = Regex.compile!("/#{file}$")
       Map.merge(config, %{
         name: name,
         format: format,
         handler: handler,
-        data_parser: data_parser,
         regex: regex,
-        chunk_size: chunk_size,
       })
     end
   end
