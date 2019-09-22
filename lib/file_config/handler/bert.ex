@@ -10,20 +10,28 @@ defmodule FileConfig.Handler.Bert do
 
   # @impl true
   @spec lookup(Loader.table_state, term) :: term
-  def lookup(%{id: tid, name: name, lazy_parse: true, data_parser: data_parser}, key) do
+  def lookup(%{id: tid, name: name, lazy_parse: true, parser: parser} = state, key) do
+    parser_opts = state[:parser_opts] || []
     case :ets.lookup(tid, key) do
       [] -> :undefined
-      [{^key, value}] ->
-        parsed_value = data_parser.parse_value(name, key, value)
-        # Cache parsed value
-        true = :ets.insert(tid, [{key, parsed_value}])
-        {:ok, parsed_value}
+      [{_key, bin}] when is_binary(bin) ->
+        case parser.decode(bin, parser_opts) do
+          {:ok, value} ->
+            # Cache parsed value
+            true = :ets.insert(tid, [{key, value}])
+            {:ok, value}
+          {:error, reason} ->
+            Lager.debug("Error parsing table #{name} key #{key}: #{inspect reason}")
+            {:ok, bin}
+        end
+      [{_key, value}] ->
+        {:ok, value}
     end
   end
   def lookup(%{id: tid}, key) do
     case :ets.lookup(tid, key) do
       [] -> :undefined
-      [{^key, value}] ->
+      [{_key, value}] ->
         {:ok, value}
     end
   end
@@ -33,12 +41,16 @@ defmodule FileConfig.Handler.Bert do
   def load_update(name, update, tid) do
     # Assume updated files contain all records
     {path, _state} = hd(update.files)
+    config = update.config
 
-    Lager.debug("Loading #{name} bert #{path}")
-    {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, update.config])
-    Lager.notice("Loaded #{name} bert #{path} #{rec} rec #{time / 1_000_000} sec")
+    # TODO: handle parse errors
 
-    %{name: name, id: tid, mod: update.mod, handler: __MODULE__}
+    Lager.debug("Loading #{name} #{config.format} #{path}")
+    {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
+    Lager.notice("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
+
+    Map.merge(%{name: name, id: tid, mod: update.mod, handler: __MODULE__},
+      Map.take(config, [:lazy_parse, :parser, :parser_opts]))
   end
 
   # @impl true
@@ -48,18 +60,19 @@ defmodule FileConfig.Handler.Bert do
   end
 
   # Internal functions
+
   @spec parse_file(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
-  def parse_file(path, tab, config) do
+  def parse_file(path, tid, config) do
     {:ok, bin} = File.read(path)
     {:ok, terms} = decode(bin)
 
     {_name, records} = terms
-              |> List.flatten()
-              |> Enum.sort() # TODO: why are we sorting?
-              |> parse_data(config)
-              # |> validate()
+                       |> List.flatten()
+                       |> Enum.sort() # TODO: why are we sorting?
+                       |> parse_records(config)
+    # |> validate()
 
-    true = :ets.insert(tab, records)
+    true = :ets.insert(tid, records)
     {:ok, length(records)}
   end
 
@@ -73,44 +86,28 @@ defmodule FileConfig.Handler.Bert do
     end
   end
 
-  # @doc "Optionally apply a transformation function to data"
-  # @spec transform([nrecs] | nrecs, map) :: nrecs
-  # defp transform([nrecs], config), do: transform(nrecs, config)
-  # defp transform({name, records}, %{transform_fun: {m, f, a}}), do: apply(m, f, [{name, records}] ++ a)
-  # defp transform({name, records}, _config), do: {name, records}
+  @spec parse_records(list({atom, list}) | {atom, list}, map) :: {atom, list}
+  defp parse_records([recs], config), do: parse_records(recs, config)
+  defp parse_records(recs, %{lazy_parse: true}), do: recs
+  defp parse_records({name, recs}, %{parser: parser} = config) do
+    parser_opts = config[:parser_opts] || []
 
-  @spec parse_data(list({atom, list}) | {atom, list}, map) :: {atom, list}
-  defp parse_data([nrecs], config), do: parse_data(nrecs, config)
-  defp parse_data(nrecs, %{lazy_parse: true}), do: nrecs
-  defp parse_data(nrecs, %{data_parser: nil}), do: nrecs
-  defp parse_data(nrecs, %{data_parser: FileConfig.DataParser.Noop}), do: nrecs
-  defp parse_data({name, recs}, %{data_parser: data_parser}) do
-    {name, Enum.map(recs, &(data_parser.parse_value(&1)))}
+    values = for {key, value} <- recs do
+      case parser.decode(value, parser_opts) do
+        {:ok, new} ->
+          {key, new}
+        {:error, reason} ->
+          Lager.debug("Error parsing table #{name} key #{key}: #{inspect reason}")
+          {key, value}
+      end
+    end
+    {name, values}
   end
+  defp parse_records(recs, _), do: recs
 
   # Validate data to make sure it matches the format
   # [{Namespace::atom(), [{Key, Val}]}]
   @spec validate({atom, list(term)}) :: {atom, list(term)} | :no_return
   def validate({name, records} = u) when is_atom(name) and is_list(records), do: u
   def validate(_), do: throw(:bad_config_format)
-
-  # @spec validate_namespaces(Keyword.t) :: boolean
-  # #  def validate_namespaces([]), do: true
-  # def validate_namespaces([{ns, _val} | rest]) when is_atom(ns) do
-  #   validate_namespaces(rest)
-  # end
-  # def validate_namespaces(_), do: false
-
-  # @spec validate_keyval(Keyword.t) :: boolean
-  # def validate_keyval([]), do: true
-  # def validate_keyval([{_ns, l=[_|_]} | rest]) do
-  #   validate_keyval1(l) and validate_keyval(rest)
-  # end
-  # def validate_keyval(_), do: false
-
-  # @spec validate_keyval1(Keyword.t) :: boolean
-  # def validate_keyval1([]), do: true
-  # def validate_keyval1([{_k,_v} | rest]), do: validate_keyval1(rest)
-  # def validate_keyval1(_), do: false
-
 end
