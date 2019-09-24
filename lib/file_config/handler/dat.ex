@@ -30,10 +30,11 @@ defmodule FileConfig.Handler.Dat do
   def load_update(name, update, tid) do
     # Assume updated files contain all records
     {path, _state} = hd(update.files)
+    config = update.config
 
-    Lager.debug("Loading #{name} dat #{path}")
-    {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, update.config])
-    Lager.notice("Loaded #{name} dat #{path} #{rec} rec #{time / 1_000_000} sec")
+    Lager.debug("Loading #{name} #{config.format} #{path}")
+    {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
+    Lager.notice("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
 
     %{name: name, id: tid, mod: update.mod, handler: __MODULE__}
   end
