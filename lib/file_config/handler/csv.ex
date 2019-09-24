@@ -67,10 +67,9 @@ defmodule FileConfig.Handler.Csv do
     # {:ok, bin} = File.read(path)
     # r = :file_config_csv2.pparse(bin, parser_processes, evt, 0)
     {tread, {:ok, bin}} = :timer.tc(File, :read, [path])
-    Lager.debug("Loaded CSV file #{path} tread #{tread / 1000000} sec")
     {tparse, r} = :timer.tc(:file_config_csv2, :pparse, [bin, parser_processes, evt, 0])
     num_records = Enum.reduce(r, 0, fn(x, a) -> a + x end)
-    Lager.info("Loaded CSV file to ETS #{inspect tid} from #{path} #{num_records} records in #{tparse / 1000000} sec")
+    Lager.debug("Loaded #{config.format} #{path} read #{tread / 1000000} parse #{tparse / 1000000}")
     {:ok, num_records}
   end
 
