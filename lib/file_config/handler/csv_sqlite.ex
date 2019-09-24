@@ -125,7 +125,7 @@ defmodule FileConfig.Handler.CsvSqlite do
              |> Stream.map(&(insert_row(statement, fetch_fn.(&1))))
     results = Enum.to_list(stream)
 
-    process_duration = :timer.now_diff(:os.timestamp(), start_time) / 1_000_000
+    tprocess = :timer.now_diff(:os.timestamp(), start_time) / 1_000_000
 
     #:ok = :esqlite3.exec("commit;", db)
     {tcommit, :ok} = :timer.tc(:esqlite3, :exec, ["commit;", db])
@@ -133,8 +133,7 @@ defmodule FileConfig.Handler.CsvSqlite do
 
     :ok = File.touch(flag_path(config.name))
 
-    Lager.debug("open time: #{topen / 1000000}, process time: #{process_duration}, commit time: #{tcommit / 1000000}")
-    # Lager.debug("open time: #{topen / 1000000}, process time: #{process_duration}")
+    Lager.debug("Loaded #{config.name} #{config.format} open #{topen / 1_000_000} process #{tprocess} commit #{tcommit / 1_000_000}")
 
     {:ok, length(results)}
   end
