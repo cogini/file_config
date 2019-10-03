@@ -1,12 +1,12 @@
-defmodule FileConfig.Mixfile do
+defmodule FileConfig.MixProject do
   use Mix.Project
 
   def project do
     [
       app: :file_config,
       version: "0.1.0",
-      elixir: "~> 1.5",
-      start_permanent: Mix.env == :prod,
+      elixir: "~> 1.8",
+      start_permanent: Mix.env() == :prod,
       dialyzer: [
         # plt_add_deps: :project,
         # plt_add_apps: [:ssl, :mnesia, :compiler, :xmerl, :inets, :disk_log],
