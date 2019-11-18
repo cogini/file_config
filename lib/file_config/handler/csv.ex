@@ -45,7 +45,7 @@ defmodule FileConfig.Handler.Csv do
 
     Logger.debug("Loading #{name} #{config.format} #{path}")
     {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
-    Logger.notice("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
+    Logger.info("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
 
     Map.merge(%{name: name, id: tid, mod: update.mod, handler: __MODULE__},
       Map.take(config, [:lazy_parse, :parser, :parser_opts]))
