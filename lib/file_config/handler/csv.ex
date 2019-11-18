@@ -1,7 +1,7 @@
 defmodule FileConfig.Handler.Csv do
   @moduledoc "Handler for CSV files"
 
-  require Lager
+  require Logger
 
   alias FileConfig.Loader
   alias FileConfig.Lib
@@ -19,7 +19,7 @@ defmodule FileConfig.Handler.Csv do
             true = :ets.insert(tid, [{key, value}])
             {:ok, value}
           {:error, reason} ->
-            Lager.debug("Error parsing table #{name} key #{key}: #{inspect reason}")
+            Logger.debug("Error parsing table #{name} key #{key}: #{inspect reason}")
             {:ok, bin}
         end
       [{_key, value}] ->
@@ -43,9 +43,9 @@ defmodule FileConfig.Handler.Csv do
 
     # TODO: handle parse errors
 
-    Lager.debug("Loading #{name} #{config.format} #{path}")
+    Logger.debug("Loading #{name} #{config.format} #{path}")
     {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
-    Lager.notice("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
+    Logger.notice("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
 
     Map.merge(%{name: name, id: tid, mod: update.mod, handler: __MODULE__},
       Map.take(config, [:lazy_parse, :parser, :parser_opts]))
@@ -69,7 +69,7 @@ defmodule FileConfig.Handler.Csv do
     {tread, {:ok, bin}} = :timer.tc(File, :read, [path])
     {tparse, r} = :timer.tc(:file_config_csv2, :pparse, [bin, parser_processes, evt, 0])
     num_records = Enum.reduce(r, 0, fn(x, a) -> a + x end)
-    Lager.debug("Loaded #{config.format} #{path} read #{tread / 1000000} parse #{tparse / 1000000}")
+    Logger.debug("Loaded #{config.format} #{path} read #{tread / 1000000} parse #{tparse / 1000000}")
     {:ok, num_records}
   end
 
@@ -104,7 +104,7 @@ defmodule FileConfig.Handler.Csv do
           {:ok, value} ->
             true = :ets.insert(tid, {key, value})
           {:error, reason} ->
-            Lager.debug("Error parsing table #{name} key #{key}: #{inspect reason}")
+            Logger.debug("Error parsing table #{name} key #{key}: #{inspect reason}")
             true = :ets.insert(tid, {key, bin})
         end
         acc + 1

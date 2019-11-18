@@ -23,34 +23,3 @@ config :file_config,
       data_parser: FileConfig.DataParser.Json,
     },
   ]
-
-config :lager,
-  error_logger_hwm: 500,
-  crash_log: 'log/crash.log',
-  crash_log_size: 10_485_760,
-  crash_log_count: 5,
-  handlers: [
-    lager_console_backend: [level: :debug],
-    lager_file_backend: [
-      file: 'log/notice.log', level: :notice, size: 10_485_760, count: 10, formatter: :lager_default_formatter,
-      formatter_config: [:date, ' ', :time, ' ', :color, '[', :severity, '] ', {:uuid, ''}, ' ', {:pid, ''},
-      {:module, [{:pid, ['@'], ''}, :module, {:function, [':', :function], ''}, {:line, [':',:line], ''}], ''}, ' ', :message, '\n'],
-    ],
-    lager_file_backend: [
-      file: 'log/error.log', level: :error, size: 10_485_760, count: 10, formatter: :lager_default_formatter,
-      formatter_config: [:date, ' ', :time, ' ', :color, '[', :severity, '] ', {:uuid, ''}, ' ', {:pid, ''},
-      {:module, [{:pid, ['@'], ''}, :module, {:function, [':', :function], ''}, {:line, [':',:line], ''}], ''}, ' ', :message, '\n'],
-    ],
-    lager_file_backend: [
-      file: 'log/info.log', level: :info, size: 10_485_760, count: 10, formatter: :lager_default_formatter,
-      formatter_config: [:date, ' ', :time, ' ', :color, '[', :severity, '] ', {:uuid, ''}, ' ', {:pid, ''},
-      {:module, [{:pid, ['@'], ''}, :module, {:function, [':', :function], ''}, {:line, [':',:line], ''}], ''}, ' ', :message, '\n'],
-    ],
-    lager_file_backend: [
-      file: 'log/debug.log', level: :debug, size: 10_485_760, count: 10, formatter: :lager_default_formatter,
-      formatter_config: [:date, ' ', :time, ' ', :color, '[', :severity, '] ', {:uuid, ''}, ' ', {:pid, ''},
-      {:module, [{:pid, ['@'], ''}, :module, {:function, [':', :function], ''}, {:line, [':',:line], ''}], ''}, ' ', :message, '\n']
-    ]
-  ],
-  colored: :true
-

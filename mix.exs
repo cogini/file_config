@@ -22,7 +22,7 @@ defmodule FileConfig.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger, :lager],
+      extra_applications: [:logger],
       mod: {FileConfig.Application, []}
     ]
   end
@@ -31,11 +31,9 @@ defmodule FileConfig.MixProject do
   defp deps do
     [
       {:dialyxir, "~> 0.5.1", only: [:dev, :test], runtime: false},
-      {:exlager, github: "khia/exlager"},
       {:gen_stage, "~> 0.14"},
       {:jason, "~> 1.0"},
       # {:lager, github: "basho/lager", override: true},
-      {:lager, "~> 3.6", override: true},
       {:recon, "~> 2.3"},
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"},

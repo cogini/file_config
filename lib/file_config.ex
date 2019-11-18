@@ -1,7 +1,7 @@
 defmodule FileConfig do
   @moduledoc "Public API"
 
-  require Lager
+  require Logger
 
   @table FileConfig.Loader
   @match_limit 500
@@ -33,7 +33,7 @@ defmodule FileConfig do
   def insert(name, records) do
     case table_info(name) do
       :undefined ->
-        Lager.warning("Unkown table #{name}")
+        Logger.warn("Unkown table #{name}")
         true
       %{handler: handler} = table_state ->
         handler.insert_records(table_state, records)
@@ -94,7 +94,7 @@ defmodule FileConfig do
       end
     catch
       :error, :badarg ->
-        Lager.warning("ets.lookup error for #{name} table #{@table}")
+        Logger.warn("ets.lookup error for #{name} table #{@table}")
         :undefined
     end
   end
@@ -109,7 +109,7 @@ defmodule FileConfig do
       end
     catch
       :error, :badarg ->
-        Lager.warning("ets.lookup error for #{name} table #{@table}")
+        Logger.warn("ets.lookup error for #{name} table #{@table}")
         :undefined
     end
   end

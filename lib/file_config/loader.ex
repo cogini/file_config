@@ -3,7 +3,7 @@ defmodule FileConfig.Loader do
   @extensions [".bert", ".csv", ".dat"]
 
   use GenServer
-  require Lager
+  require Logger
 
   # @typedoc ""
   @type files :: map
@@ -56,12 +56,12 @@ defmodule FileConfig.Loader do
 
     changed_files = get_changed_files(new_files, old_files)
     # for {name, value} <- changed_files do
-    #   Lager.debug("changed_file: #{name} #{inspect value}")
+    #   Logger.debug("changed_file: #{name} #{inspect value}")
     # end
 
     new_tables = process_changed_files(changed_files)
     # for new_table <- new_tables do
-    #   Lager.debug("new_table: #{inspect new_table}")
+    #   Logger.debug("new_table: #{inspect new_table}")
     # end
 
     old_tables = update_table_index(new_tables)
@@ -75,7 +75,7 @@ defmodule FileConfig.Loader do
   @spec process_file_configs(list({name, map})) :: list(file_config)
   def process_file_configs(files) do
     for {config_name, config} <- files do
-      # Lager.info("Loading #{config_name} #{inspect config}")
+      # Logger.info("Loading #{config_name} #{inspect config}")
       name = config[:name] || config_name
       file = config.file
       format = config[:format] || ext_to_format(Path.extname(file))
@@ -168,13 +168,13 @@ defmodule FileConfig.Loader do
   def maybe_create_table(name, mod, config) do
     case :ets.lookup(__MODULE__, name) do
       [] ->
-        Lager.debug("Creating ETS table #{name} new")
+        Logger.debug("Creating ETS table #{name} new")
         create_ets_table(config)
       [{_name, %{id: tid, mod: m}}] when m == mod ->
-        Lager.debug("Using existing ETS table #{name}")
+        Logger.debug("Using existing ETS table #{name}")
         tid
       [{_name, %{}}] ->
-        Lager.debug("Creating ETS table #{name} update")
+        Logger.debug("Creating ETS table #{name} update")
         create_ets_table(config)
     end
   end
@@ -193,10 +193,10 @@ defmodule FileConfig.Loader do
     old_tables = Enum.reduce(new_tables, [], fn(%{name: name}, acc) ->
       case :ets.lookup(__MODULE__, name) do
         [] ->
-          # Lager.debug("ETS new_table: #{name}")
+          # Logger.debug("ETS new_table: #{name}")
           acc
         [{_name, %{id: tid}}] ->
-          # Lager.debug("ETS old_table: #{name} #{inspect tid}")
+          # Logger.debug("ETS old_table: #{name} #{inspect tid}")
           [{name, tid} | acc]
       end
     end)
@@ -214,7 +214,7 @@ defmodule FileConfig.Loader do
   @spec delete_tables(list(:ets.tab)) :: :ok
   def delete_tables(tables) do
     for {name, tid} <- tables do
-      Lager.debug("Deleting old ETS table: #{inspect name} #{inspect tid}")
+      Logger.debug("Deleting old ETS table: #{inspect name} #{inspect tid}")
       :ets.delete(tid)
     end
     :ok
@@ -224,7 +224,7 @@ defmodule FileConfig.Loader do
   @spec notify_update([map]) :: :ok
   def notify_update(tables) do
     for %{name: name} <- tables do
-      # Lager.debug("notify_update: #{inspect name}")
+      # Logger.debug("notify_update: #{inspect name}")
       FileConfig.EventProducer.sync_notify({:load, name})
     end
     :ok
@@ -251,7 +251,7 @@ defmodule FileConfig.Loader do
     {:binary_memory, binary_memory} = :recon.info(self(), :binary_memory)
     if binary_memory > 50_000_000 do
       # Manually trigger garbage collection to clear refc binary memory
-      Lager.debug("Forcing garbage collection")
+      Logger.debug("Forcing garbage collection")
       :erlang.garbage_collect(self())
     end
   end

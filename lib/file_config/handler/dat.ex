@@ -1,7 +1,7 @@
 defmodule FileConfig.Handler.Dat do
   @moduledoc "Handler for dat files"
 
-  require Lager
+  require Logger
 
   alias FileConfig.Loader
 
@@ -32,9 +32,9 @@ defmodule FileConfig.Handler.Dat do
     {path, _state} = hd(update.files)
     config = update.config
 
-    Lager.debug("Loading #{name} #{config.format} #{path}")
+    Logger.debug("Loading #{name} #{config.format} #{path}")
     {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
-    Lager.notice("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
+    Logger.info("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
 
     %{name: name, id: tid, mod: update.mod, handler: __MODULE__}
   end

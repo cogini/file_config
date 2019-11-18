@@ -1,7 +1,7 @@
 defmodule FileConfig.EventConsumer do
   use GenStage
 
-  require Lager
+  require Logger
 
   @doc "Starts the consumer."
   def start_link(state) do
@@ -16,7 +16,7 @@ defmodule FileConfig.EventConsumer do
 
   def handle_events(events, _from, state) do
     for event <- events do
-      Lager.debug("Received event #{inspect event}")
+      Logger.debug("Received event #{inspect event}")
     end
     {:noreply, [], state}
   end

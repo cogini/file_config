@@ -1,7 +1,7 @@
 defmodule FileConfig.Handler.Bert do
   @moduledoc "Handler for BERT files"
 
-  require Lager
+  require Logger
 
   alias FileConfig.Loader
 
@@ -21,7 +21,7 @@ defmodule FileConfig.Handler.Bert do
             true = :ets.insert(tid, [{key, value}])
             {:ok, value}
           {:error, reason} ->
-            Lager.debug("Error parsing table #{name} key #{key}: #{inspect reason}")
+            Logger.debug("Error parsing table #{name} key #{key}: #{inspect reason}")
             {:ok, bin}
         end
       [{_key, value}] ->
@@ -45,9 +45,9 @@ defmodule FileConfig.Handler.Bert do
 
     # TODO: handle parse errors
 
-    Lager.debug("Loading #{name} #{config.format} #{path}")
+    Logger.debug("Loading #{name} #{config.format} #{path}")
     {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
-    Lager.notice("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
+    Logger.info("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
 
     Map.merge(%{name: name, id: tid, mod: update.mod, handler: __MODULE__},
       Map.take(config, [:lazy_parse, :parser, :parser_opts]))
@@ -97,7 +97,7 @@ defmodule FileConfig.Handler.Bert do
         {:ok, new} ->
           {key, new}
         {:error, reason} ->
-          Lager.debug("Error parsing table #{name} key #{key}: #{inspect reason}")
+          Logger.debug("Error parsing table #{name} key #{key}: #{inspect reason}")
           {key, value}
       end
     end

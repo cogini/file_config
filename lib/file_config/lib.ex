@@ -1,7 +1,7 @@
 defmodule FileConfig.Lib do
   @moduledoc "Common functions"
 
-  require Lager
+  require Logger
 
   @doc "Get nth element from reversed list"
   @spec rnth(non_neg_integer, list) :: term
@@ -24,7 +24,7 @@ defmodule FileConfig.Lib do
         true = :ets.insert(tid, {key, value})
         value
       {:error, reason} ->
-        Lager.debug("Invalid binary JSON for table #{name} key #{key}: #{inspect reason}")
+        Logger.debug("Invalid binary JSON for table #{name} key #{key}: #{inspect reason}")
         value
     end
     # if :jsx.is_json(value) do
@@ -32,7 +32,7 @@ defmodule FileConfig.Lib do
     #   true = :ets.insert(tid, {key, value})
     #   value
     # else
-    #   Lager.debug("Invalid binary JSON for table #{name} key #{key}")
+    #   Logger.debug("Invalid binary JSON for table #{name} key #{key}")
     #   value
     # end
   end
