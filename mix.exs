@@ -33,7 +33,6 @@ defmodule FileConfig.MixProject do
       {:dialyxir, "~> 0.5.1", only: [:dev, :test], runtime: false},
       {:gen_stage, "~> 0.14"},
       {:jason, "~> 1.0"},
-      # {:lager, github: "basho/lager", override: true},
       {:recon, "~> 2.3"},
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"},
