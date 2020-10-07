@@ -8,9 +8,9 @@ defmodule FileConfig.MixProject do
       app: :file_config,
       version: "0.1.0",
       elixir: "~> 1.8",
-      elixirc_paths: elixirc_paths(Mix.env),
-      build_embedded: Mix.env == :prod,
-      start_permanent: Mix.env == :prod,
+      elixirc_paths: elixirc_paths(Mix.env()),
+      build_embedded: Mix.env() == :prod,
+      start_permanent: Mix.env() == :prod,
       description: description(),
       package: package(),
       source_url: @github,
@@ -49,8 +49,8 @@ defmodule FileConfig.MixProject do
   defp deps do
     [
       {:credo, "~> 1.1", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 0.5", only: [:dev, :test], runtime: false},
-      {:ex_doc, "~> 0.19.2", only: :dev, runtime: false},
+      {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:excoveralls, "~> 0.12.0", only: [:dev, :test], runtime: false},
       {:gen_stage, "~> 0.14"},
       {:jason, "~> 1.0"},
@@ -75,7 +75,9 @@ defmodule FileConfig.MixProject do
   defp docs do
     [
       source_url: @github,
-      extras: ["README.md"]
+      extras: ["README.md", "CHANGELOG.md"],
+      # api_reference: false,
+      source_url_pattern: "#{@github}/blob/master/%{path}#L%{line}"
     ]
   end
 
