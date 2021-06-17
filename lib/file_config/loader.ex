@@ -6,11 +6,11 @@ defmodule FileConfig.Loader do
   require Logger
 
   # @typedoc ""
-  @type files :: map
-  @type file_config :: map
-  @type table_state :: map
-  @type update :: map
-  @type name :: atom
+  @type files :: map()
+  @type file_config :: map()
+  @type table_state :: map()
+  @type update :: map()
+  @type name :: atom()
 
   # GenServer callbacks
 
@@ -159,6 +159,7 @@ defmodule FileConfig.Loader do
     for {name, update} <- changed_files do
       config = update.config
       tid = maybe_create_table(name, update.mod, config)
+      Logger.debug("Loading file #{name}")
       config.handler.load_update(name, update, tid)
     end
   end
