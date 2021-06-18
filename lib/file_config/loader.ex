@@ -53,10 +53,13 @@ defmodule FileConfig.Loader do
   @spec check_files(files, map) :: {[:ets.tid], files}
   def check_files(old_files, state) do
     new_files = get_files(state.data_dirs, state.file_configs)
+    # for {name, value} <- new_files do
+    #   Logger.warning("new_files: #{name} #{inspect(value)}")
+    # end
 
     changed_files = get_changed_files(new_files, old_files)
     # for {name, value} <- changed_files do
-    #   Logger.debug("changed_file: #{name} #{inspect value}")
+    #   Logger.error("changed_file: #{name} #{inspect value}")
     # end
 
     new_tables = process_changed_files(changed_files)
@@ -93,14 +96,22 @@ defmodule FileConfig.Loader do
   @doc "Look for files in data dirs"
   @spec get_files(list(Path.t), list(file_config)) :: files
   def get_files(data_dirs, file_configs) do
-    path_configs = for data_dir <- data_dirs,
-      path <- list_files(data_dir),
-      config <- file_configs,
-      Regex.match?(config.regex, path), do: {path, config}
+    path_configs =
+      for data_dir <- data_dirs,
+        path <- list_files(data_dir),
+        config <- file_configs,
+        Regex.match?(config.regex, path), do: {path, config}
 
-    files = for {path, config} <- path_configs,
-      {:ok, stat} = File.stat(path),
-      stat.size > 0, do: {path, config, %{mod: stat.mtime}}
+    files =
+      for {path, config} <- path_configs,
+        {:ok, stat} = File.stat(path),
+        stat.size > 0, do: {path, config, %{mod: stat.mtime}}
+
+    # Logger.warning("files: #{inspect(files)}")
+
+    # for {path, config, mtime} <- files do
+    #   Logger.warning("file: #{inspect(path)} #{inspect(config)} #{inspect(mtime)}")
+    # end
 
     files
     |> Enum.reduce(%{}, &group_by_name/2)
