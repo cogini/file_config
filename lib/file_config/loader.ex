@@ -94,7 +94,7 @@ defmodule FileConfig.Loader do
   end
 
   @doc "Look for files in data dirs"
-  @spec get_files(list(Path.t), list(file_config)) :: files
+  @spec get_files(list(Path.t()), list(file_config)) :: files
   def get_files(data_dirs, file_configs) do
     path_configs =
       for data_dir <- data_dirs,
