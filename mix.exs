@@ -52,7 +52,7 @@ defmodule FileConfig.MixProject do
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.23", only: :dev, runtime: false},
       {:excoveralls, "~> 0.14.0", only: [:dev, :test], runtime: false},
-      {:file_config, github: "cogini/file_config"},
+      {:file_config_rocksdb, github: "cogini/file_config_rocksdb"},
       {:gen_stage, "~> 0.14"},
       {:jason, "~> 1.0"},
       {:recon, "~> 2.3"},
