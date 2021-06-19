@@ -6,6 +6,8 @@ defmodule FileConfig.Application do
 
   def start(_type, _args) do
 
+    {:ok, _} = Application.ensure_all_started(:file_config_rocksdb, :permanent)
+
     children = [
       {FileConfig.EventProducer, []},
       # {FileConfig.EventConsumer, []},
