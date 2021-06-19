@@ -27,8 +27,7 @@ defmodule FileConfig.Loader do
     check_delay = config[:check_delay] || 5000
 
     {old_tables, new_files} = check_files(%{}, %{data_dirs: data_dirs, file_configs: file_configs})
-    Logger.info("new_files: #{inspect(new_files, limit: :inifinity)}")
-    # new_files = Enum.reject(new_files, &is_async/1)
+    new_files = Enum.reject(new_files, &is_async/1)
 
     free_binary_memory()
     {:ok, %{ref: :erlang.start_timer(check_delay, self(), :reload),
