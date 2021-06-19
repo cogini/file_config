@@ -28,7 +28,8 @@ defmodule FileConfig.Loader do
 
     {old_tables, new_files} = check_files(%{}, %{data_dirs: data_dirs, file_configs: file_configs})
     Logger.warning("new_files: #{inspect(new_files)}")
-    # new_files = Enum.reject(new_files, &is_async/1)
+    new_files = Enum.reject(new_files, &is_async/1) |> Enum.into(%{})
+    Logger.warning("new_files async: #{inspect(new_files)}")
 
     free_binary_memory()
     {:ok, %{ref: :erlang.start_timer(check_delay, self(), :reload),
