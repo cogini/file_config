@@ -13,6 +13,8 @@ defmodule FileConfig.MixProject do
       start_permanent: Mix.env() == :prod,
       description: description(),
       package: package(),
+      docs: docs(),
+      deps: deps(),
       source_url: @github,
       homepage_url: @github,
       dialyzer: [
@@ -23,8 +25,6 @@ defmodule FileConfig.MixProject do
         # flags: ["-Wunmatched_returns", :error_handling, :race_conditions, :underspecs],
         # ignore_warnings: "dialyzer.ignore-warnings"
       ],
-      deps: deps(),
-      docs: docs(),
       test_coverage: [tool: ExCoveralls],
       preferred_cli_env: [coveralls: :test, "coveralls.detail": :test, "coveralls.post": :test, "coveralls.html": :test],
     ]
@@ -48,10 +48,11 @@ defmodule FileConfig.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:credo, "~> 1.1", only: [:dev, :test], runtime: false},
+      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
-      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
-      {:excoveralls, "~> 0.12.0", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.23", only: :dev, runtime: false},
+      {:excoveralls, "~> 0.14.0", only: [:dev, :test], runtime: false},
+      {:file_config, github: "cogini/file_config"},
       {:gen_stage, "~> 0.14"},
       {:jason, "~> 1.0"},
       {:recon, "~> 2.3"},
@@ -72,11 +73,12 @@ defmodule FileConfig.MixProject do
 
   defp docs do
     [
-      source_url: @github,
+      main: "readme",
       extras: ["README.md", "CHANGELOG.md"],
+      skip_undefined_reference_warnings_on: ["CHANGELOG.md"],
+      source_url: @github,
       # api_reference: false,
       source_url_pattern: "#{@github}/blob/master/%{path}#L%{line}"
     ]
   end
-
 end
