@@ -27,6 +27,8 @@ defmodule FileConfig.Loader do
     check_delay = config[:check_delay] || 5000
 
     {old_tables, new_files} = check_files(%{}, %{data_dirs: data_dirs, file_configs: file_configs})
+    new_files = Enum.reject(new_files, &is_async/1)
+
     free_binary_memory()
     {:ok, %{ref: :erlang.start_timer(check_delay, self(), :reload),
       old_tables: old_tables, files: new_files,
@@ -50,7 +52,7 @@ defmodule FileConfig.Loader do
   # API
 
   @doc "Check for changes to configured files"
-  @spec check_files(files, map) :: {[:ets.tid], files}
+  @spec check_files(files(), map()) :: {[:ets.tid()], files()}
   def check_files(old_files, state) do
     new_files = get_files(state.data_dirs, state.file_configs)
     # for {name, value} <- new_files do
@@ -136,7 +138,7 @@ defmodule FileConfig.Loader do
   end
 
   @doc "Sort files by modification time and set overall latest time"
-  @spec sort_by_mod({name, update}, map) :: map
+  @spec sort_by_mod({name(), update()}, map()) :: map()
   def sort_by_mod({name, v}, acc) do
     # Sort files by modification time (newer to older)
     files = Enum.sort(v.files, fn({_, %{mod: a}}, {_, %{mod: b}}) -> a > b end)
@@ -145,7 +147,7 @@ defmodule FileConfig.Loader do
   end
 
   @doc "Determine if files have changed since last run"
-  @spec get_changed_files(files, files) :: files
+  @spec get_changed_files(files(), files()) :: files()
   def get_changed_files(new_files, old_files) do
     Enum.reduce(new_files, %{}, fn({name, v}, acc) ->
       case Map.fetch(old_files, name) do
@@ -259,6 +261,9 @@ defmodule FileConfig.Loader do
     :ets.foldl(fn({key, value}, acc) -> [{key, value} | acc] end, [], __MODULE__)
   end
 
+  defp is_async(%{config: %{async: true}}), do: true
+  defp is_async(_), do: false
+
   def free_binary_memory do
     {:binary_memory, binary_memory} = :recon.info(self(), :binary_memory)
     if binary_memory > 50_000_000 do
@@ -267,5 +272,4 @@ defmodule FileConfig.Loader do
       :erlang.garbage_collect(self())
     end
   end
-
 end
