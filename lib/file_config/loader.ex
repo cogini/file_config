@@ -261,7 +261,7 @@ defmodule FileConfig.Loader do
     :ets.foldl(fn({key, value}, acc) -> [{key, value} | acc] end, [], __MODULE__)
   end
 
-  defp is_async(%{config: %{async: true}}), do: true
+  defp is_async({_name, %{config: %{async: true}}}), do: true
   defp is_async(_), do: false
 
   def free_binary_memory do
