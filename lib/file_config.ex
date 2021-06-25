@@ -52,6 +52,18 @@ defmodule FileConfig do
     loop_all({table(name), :_, @match_limit})
   end
 
+  def flush(name) do
+    case table_info(name) do
+      :undefined ->
+        Logger.warn("Unkown table #{name}")
+        true
+      %{handler: handler} = table_state ->
+        # TODO: This should call flush on handler
+        # handler.flush(table_state)
+        :ets.delete_all_objects(table_state.id)
+    end
+  end
+
   # The version is the table id, which should be swapped on
   # any update. This is a very scary thing to use, but it works
   # as long as we use it as an opaque data type.
