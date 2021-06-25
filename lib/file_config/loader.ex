@@ -106,11 +106,11 @@ defmodule FileConfig.Loader do
 
     async =
       fn
-        {path, %{config: %{async: true}}} -> boot
+        {_path, %{config: %{async: true}}} -> boot
         _ -> false
       end
 
-    path_configs = Enum.reject(path_configs, &async/1) |> Enum.into(%{})
+    path_configs = Enum.reject(path_configs, async) |> Enum.into(%{})
 
     files =
       for {path, config} <- path_configs,
