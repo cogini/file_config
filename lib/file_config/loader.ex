@@ -27,7 +27,6 @@ defmodule FileConfig.Loader do
     check_delay = config[:check_delay] || 5000
 
     {old_tables, new_files} = check_files(%{}, %{data_dirs: data_dirs, file_configs: file_configs}, true)
-    # new_files = Enum.reject(new_files, &is_async/1) |> Enum.into(%{})
 
     free_binary_memory()
     {:ok, %{ref: :erlang.start_timer(check_delay, self(), :reload),
@@ -106,7 +105,13 @@ defmodule FileConfig.Loader do
 
     async =
       fn
-        {_path, %{config: %{async: true}}} -> boot
+        {path, %{config: %{async: true}}} ->
+          if boot do
+            Logger.debug("Skipping async #{path}")
+            true
+          else
+            false
+          end
         _ -> false
       end
 
