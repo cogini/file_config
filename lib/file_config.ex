@@ -57,7 +57,7 @@ defmodule FileConfig do
       :undefined ->
         Logger.warn("Unkown table #{name}")
         true
-      %{handler: handler} = table_state ->
+      %{handler: _handler} = table_state ->
         # TODO: This should call flush on handler
         # handler.flush(table_state)
         :ets.delete_all_objects(table_state.id)
