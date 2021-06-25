@@ -53,7 +53,7 @@ defmodule FileConfig.Loader do
 
   @doc "Check for changes to configured files"
   @spec check_files(files(), map()) :: {[:ets.tid()], files()}
-  def check_files(old_files, state, boot) do
+  def check_files(old_files, state, boot \\ false) do
     new_files = get_files(state.data_dirs, state.file_configs, boot)
     # for {name, value} <- new_files do
     #   Logger.warning("new_files: #{name} #{inspect(value)}")
