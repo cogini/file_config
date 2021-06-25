@@ -53,6 +53,7 @@ defmodule FileConfig.Loader do
   @doc "Check for changes to configured files"
   @spec check_files(files(), map()) :: {[:ets.tid()], files()}
   def check_files(old_files, state, boot \\ false) do
+    Logger.debug("boot: #{boot}")
     new_files = get_files(state.data_dirs, state.file_configs, boot)
     # for {name, value} <- new_files do
     #   Logger.warning("new_files: #{name} #{inspect(value)}")
@@ -103,11 +104,11 @@ defmodule FileConfig.Loader do
         config <- file_configs,
         Regex.match?(config.regex, path), do: {path, config}
 
-    async =
+    is_async =
       fn
         {path, %{config: %{async: true}}} ->
           if boot do
-            Logger.debug("Skipping async #{path}")
+            Logger.warning("Skipping async #{path}")
             true
           else
             false
@@ -115,7 +116,7 @@ defmodule FileConfig.Loader do
         _ -> false
       end
 
-    path_configs = Enum.reject(path_configs, async) |> Enum.into(%{})
+    path_configs = Enum.reject(path_configs, is_async) |> Enum.into(%{})
 
     files =
       for {path, config} <- path_configs,
