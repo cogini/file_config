@@ -81,7 +81,7 @@ defmodule FileConfig.Handler.Csv do
 
     # {:ok, bin} = File.read(path)
     # r = :file_config_csv2.pparse(bin, parser_processes, evt, 0)
-    Logger.warning("File: #{path}")
+    # Logger.warning("File: #{path}")
     {tread, {:ok, bin}} = :timer.tc(File, :read, [path])
     {tparse, r} = :timer.tc(:file_config_csv2, :pparse, [bin, parser_processes, evt, 0])
     num_records = Enum.reduce(r, 0, fn x, a -> a + x end)
