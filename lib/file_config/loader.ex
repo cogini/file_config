@@ -26,8 +26,8 @@ defmodule FileConfig.Loader do
     file_configs = process_file_configs(config[:files] || [])
     check_delay = config[:check_delay] || 5000
 
-    {old_tables, new_files} = check_files(%{}, %{data_dirs: data_dirs, file_configs: file_configs})
-    new_files = Enum.reject(new_files, &is_async/1) |> Enum.into(%{})
+    {old_tables, new_files} = check_files(%{}, %{data_dirs: data_dirs, file_configs: file_configs}, true)
+    # new_files = Enum.reject(new_files, &is_async/1) |> Enum.into(%{})
 
     free_binary_memory()
     {:ok, %{ref: :erlang.start_timer(check_delay, self(), :reload),
@@ -53,8 +53,8 @@ defmodule FileConfig.Loader do
 
   @doc "Check for changes to configured files"
   @spec check_files(files(), map()) :: {[:ets.tid()], files()}
-  def check_files(old_files, state) do
-    new_files = get_files(state.data_dirs, state.file_configs)
+  def check_files(old_files, state, boot) do
+    new_files = get_files(state.data_dirs, state.file_configs, boot)
     # for {name, value} <- new_files do
     #   Logger.warning("new_files: #{name} #{inspect(value)}")
     # end
@@ -97,12 +97,20 @@ defmodule FileConfig.Loader do
 
   @doc "Look for files in data dirs"
   @spec get_files(list(Path.t()), list(file_config)) :: files()
-  def get_files(data_dirs, file_configs) do
+  def get_files(data_dirs, file_configs, boot \\ false) do
     path_configs =
       for data_dir <- data_dirs,
         path <- list_files(data_dir),
         config <- file_configs,
         Regex.match?(config.regex, path), do: {path, config}
+
+    async =
+      fn
+        {path, %{config: %{async: true}}} -> boot
+        _ -> false
+      end
+
+    path_configs = Enum.reject(path_configs, &async/1) |> Enum.into(%{})
 
     files =
       for {path, config} <- path_configs,
@@ -261,8 +269,8 @@ defmodule FileConfig.Loader do
     :ets.foldl(fn({key, value}, acc) -> [{key, value} | acc] end, [], __MODULE__)
   end
 
-  defp is_async({_name, %{config: %{async: true}}}), do: true
-  defp is_async(_), do: false
+  # defp is_async({_name, %{config: %{async: true}}}), do: true
+  # defp is_async(_), do: false
 
   def free_binary_memory do
     {:binary_memory, binary_memory} = :recon.info(self(), :binary_memory)
