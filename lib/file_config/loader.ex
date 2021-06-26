@@ -53,7 +53,7 @@ defmodule FileConfig.Loader do
   @doc "Check for changes to configured files"
   @spec check_files(files(), map()) :: {[:ets.tid()], files()}
   def check_files(old_files, state, init \\ false) do
-    Logger.info("init: #{init}")
+    Logger.debug("init: #{init}")
     new_files = get_files(state.data_dirs, state.file_configs, init)
     # for {name, value} <- new_files do
     #   Logger.warning("new_files: #{name} #{inspect(value)}")
@@ -104,12 +104,11 @@ defmodule FileConfig.Loader do
         config <- file_configs,
         Regex.match?(config.regex, path), do: {path, config}
 
-    Logger.warning("path_configs: #{inspect(path_configs)}")
     is_async =
       fn
         {path, %{async: true}} ->
           if init do
-            Logger.warning("Skipping async #{path}")
+            Logger.debug("Skipping async file #{path}")
             true
           else
             false
@@ -118,14 +117,11 @@ defmodule FileConfig.Loader do
       end
 
     path_configs = Enum.reject(path_configs, is_async)
-    Logger.warning("path_configs: #{inspect(path_configs)}")
 
     files =
       for {path, config} <- path_configs,
         {:ok, stat} = File.stat(path),
         stat.size > 0, do: {path, config, %{mod: stat.mtime}}
-
-    Logger.warning("files: #{inspect(files)}")
 
     # for {path, config, mtime} <- files do
     #   Logger.warning("file: #{inspect(path)} #{inspect(config)} #{inspect(mtime)}")
