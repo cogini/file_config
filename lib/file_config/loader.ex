@@ -117,7 +117,7 @@ defmodule FileConfig.Loader do
         _ -> false
       end
 
-    path_configs = Enum.reject(path_configs, is_async))
+    path_configs = Enum.reject(path_configs, is_async)
     Logger.warning("path_configs: #{inspect(path_configs)}")
 
     files =
