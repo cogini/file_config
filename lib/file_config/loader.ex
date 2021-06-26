@@ -52,9 +52,9 @@ defmodule FileConfig.Loader do
 
   @doc "Check for changes to configured files"
   @spec check_files(files(), map()) :: {[:ets.tid()], files()}
-  def check_files(old_files, state, boot \\ false) do
-    Logger.info("boot: #{boot}")
-    new_files = get_files(state.data_dirs, state.file_configs, boot)
+  def check_files(old_files, state, init \\ false) do
+    Logger.info("init: #{init}")
+    new_files = get_files(state.data_dirs, state.file_configs, init)
     # for {name, value} <- new_files do
     #   Logger.warning("new_files: #{name} #{inspect(value)}")
     # end
@@ -97,7 +97,7 @@ defmodule FileConfig.Loader do
 
   @doc "Look for files in data dirs"
   @spec get_files(list(Path.t()), list(file_config)) :: files()
-  def get_files(data_dirs, file_configs, boot \\ false) do
+  def get_files(data_dirs, file_configs, init \\ false) do
     path_configs =
       for data_dir <- data_dirs,
         path <- list_files(data_dir),
@@ -108,7 +108,7 @@ defmodule FileConfig.Loader do
     is_async =
       fn
         {path, %{async: true}} ->
-          if boot do
+          if init do
             Logger.warning("Skipping async #{path}")
             true
           else
@@ -117,7 +117,7 @@ defmodule FileConfig.Loader do
         _ -> false
       end
 
-    path_configs = Enum.reject(path_configs, is_async) |> Enum.into(%{})
+    path_configs = Enum.reject(path_configs, is_async))
     Logger.warning("path_configs: #{inspect(path_configs)}")
 
     files =
