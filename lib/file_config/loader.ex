@@ -155,7 +155,7 @@ defmodule FileConfig.Loader do
   @spec sort_by_mod({name(), update()}, map()) :: map()
   def sort_by_mod({name, v}, acc) do
     # Sort files by modification time (newer to older)
-    files = Enum.sort(v.files, fn({_, %{mod: a}}, {_, %{mod: b}}) -> a > b end)
+    files = Enum.sort(v.files, fn({_, %{mod: a}}, {_, %{mod: b}}) -> a >= b end)
     {_path, %{mod: mod}} = hd(files)
     Map.put(acc, name, Map.merge(v, %{files: files, mod: mod}))
   end
