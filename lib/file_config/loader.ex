@@ -53,7 +53,7 @@ defmodule FileConfig.Loader do
   @doc "Check for changes to configured files"
   @spec check_files(files(), map()) :: {[:ets.tid()], files()}
   def check_files(old_files, state, init \\ false) do
-    Logger.debug("init: #{init}")
+    # Logger.debug("init: #{init}")
     new_files = get_files(state.data_dirs, state.file_configs, init)
     # for {name, value} <- new_files do
     #   Logger.warning("new_files: #{name} #{inspect(value)}")
@@ -80,7 +80,7 @@ defmodule FileConfig.Loader do
   @spec process_file_configs(list({name, map})) :: list(file_config)
   def process_file_configs(files) do
     for {config_name, config} <- files do
-      # Logger.info("Loading #{config_name} #{inspect config}")
+      Logger.info("Loading #{config_name} #{inspect config}")
       name = config[:name] || config_name
       file = config.file
       format = config[:format] || ext_to_format(Path.extname(file))
