@@ -100,7 +100,7 @@ defmodule FileConfig.Loader do
   def get_files(data_dirs, file_configs, init \\ false) do
     path_configs =
       for data_dir <- data_dirs,
-        {:ok, paths} <- list_files(data_dir),
+        paths <- list_files(data_dir),
         path <- paths,
         config <- file_configs,
         Regex.match?(config.regex, path), do: {path, config}
@@ -134,22 +134,20 @@ defmodule FileConfig.Loader do
   end
 
   @doc "List files in dir with config file extensions"
-  @spec list_files(Path.t()) :: {:ok, [Path.t()]}
+  @spec list_files(Path.t()) :: [Path.t()]
   def list_files(dir) do
     with {:ok, _stat} <- File.stat(dir),
          {:ok, files} <- File.ls(dir)
     do
-      results =
-        for file <- files,
-            Path.extname(file) in @extensions
-        do
-          Path.join(dir, file)
-        end
-      {:ok, results}
+      for file <- files,
+          Path.extname(file) in @extensions
+      do
+        Path.join(dir, file)
+      end
     else
       err ->
         Logger.debug("#{inspect(err)}")
-        {:ok, []}
+        []
     end
   end
 
