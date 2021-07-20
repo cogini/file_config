@@ -133,10 +133,15 @@ defmodule FileConfig.Loader do
   end
 
   @doc "List files in dir with config file extensions"
-  @spec list_files(Path.t) :: [Path.t]
+  @spec list_files(Path.t()) :: [Path.t()]
   def list_files(dir) do
-    {:ok, files} = File.ls(dir)
-    for file <- files, Path.extname(file) in @extensions, do: Path.join(dir, file)
+    with {:ok, _stat} <- File.stat(dir),
+         {:ok, files} <- File.ls(dir)
+    do
+      for file <- files, Path.extname(file) in @extensions, do: Path.join(dir, file)
+    else
+      _ -> []
+    end
   end
 
   @doc "Collect multiple files for the same name"
