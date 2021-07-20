@@ -1,6 +1,6 @@
 defmodule FileConfig.Loader do
   @moduledoc "Load files"
-  @extensions [".bert", ".csv", ".dat"]
+  @extensions [".bert", ".csv", ".dat", ".log"]
 
   use GenServer
   require Logger
@@ -100,7 +100,8 @@ defmodule FileConfig.Loader do
   def get_files(data_dirs, file_configs, init \\ false) do
     path_configs =
       for data_dir <- data_dirs,
-        path <- list_files(data_dir),
+        {:ok, paths} <- list_files(data_dir),
+        path <- paths,
         config <- file_configs,
         Regex.match?(config.regex, path), do: {path, config}
 
@@ -133,14 +134,22 @@ defmodule FileConfig.Loader do
   end
 
   @doc "List files in dir with config file extensions"
-  @spec list_files(Path.t()) :: [Path.t()]
+  @spec list_files(Path.t()) :: {:ok, [Path.t()]}
   def list_files(dir) do
     with {:ok, _stat} <- File.stat(dir),
          {:ok, files} <- File.ls(dir)
     do
-      for file <- files, Path.extname(file) in @extensions, do: Path.join(dir, file)
+      results =
+        for file <- files,
+            Path.extname(file) in @extensions
+        do
+          Path.join(dir, file)
+        end
+      {:ok, results}
     else
-      _ -> []
+      err ->
+        Logger.debug("#{inspect(err)}")
+        {:ok, []}
     end
   end
 
