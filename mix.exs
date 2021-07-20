@@ -58,7 +58,7 @@ defmodule FileConfig.MixProject do
       {:ex_doc, "~> 0.23", only: :dev, runtime: false},
       {:excoveralls, "~> 0.14.0", only: [:dev, :test], runtime: false},
       {:file_config_rocksdb, github: "cogini/file_config_rocksdb"},
-      # {:gen_stage, "~> 1.0"},
+      {:gen_stage, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:recon, "~> 2.5", override: true},
     ]
