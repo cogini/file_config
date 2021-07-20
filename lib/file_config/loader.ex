@@ -100,8 +100,7 @@ defmodule FileConfig.Loader do
   def get_files(data_dirs, file_configs, init \\ false) do
     path_configs =
       for data_dir <- data_dirs,
-        paths <- list_files(data_dir),
-        path <- paths,
+        path <- list_files(data_dir),
         config <- file_configs,
         Regex.match?(config.regex, path), do: {path, config}
 
