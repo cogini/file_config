@@ -262,7 +262,7 @@ defmodule FileConfig.Loader do
         Logger.debug("Creating ETS table #{name} new")
         create_ets_table(config)
       [{_name, %{id: tid, mod: m}}] when m == mod ->
-        Logger.debug("Using existing ETS table #{name}")
+        Logger.debug("Using existing ETS table #{name} #{inspect(tid)}")
         tid
       [{_name, %{}}] ->
         Logger.debug("Creating ETS table #{name} update")
@@ -286,10 +286,10 @@ defmodule FileConfig.Loader do
       fn %{name: name}, acc ->
         case :ets.lookup(__MODULE__, name) do
           [] ->
-            # Logger.debug("ETS new_table: #{name}")
+            Logger.debug("ETS new_table: #{name}")
             acc
           [{_name, %{id: tid}}] ->
-            # Logger.debug("ETS old_table: #{name} #{inspect tid}")
+            Logger.debug("ETS old_table: #{name} #{inspect tid}")
             [{name, tid} | acc]
         end
       end)
