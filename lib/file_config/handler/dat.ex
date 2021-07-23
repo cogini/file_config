@@ -26,8 +26,8 @@ defmodule FileConfig.Handler.Dat do
   end
 
   # @impl true
-  @spec load_update(Loader.name, Loader.update, :ets.tid) :: Loader.table_state
-  def load_update(name, update, tid) do
+  @spec load_update(Loader.name(), Loader.update(), :ets.tid(), Loader.update()) :: Loader.table_state()
+  def load_update(name, update, tid, _prev) do
     # Assume updated files contain all records
     {path, _state} = hd(update.files)
     config = update.config
