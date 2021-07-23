@@ -253,7 +253,7 @@ defmodule FileConfig.Loader do
   #   # new_tables = process_changed_files(changed_files)
 
   # Create table_sate data
-  @spec make_table_state(name(), map(), :ets.tid()) :: table_state()
+  @spec make_table_state(module(), name(), map(), :ets.tid()) :: table_state()
   def make_table_state(handler, name, update, tid) do
     %{config: config, mod: mod} = update
     Map.merge(%{name: name, id: tid, mod: mod, handler: handler},
