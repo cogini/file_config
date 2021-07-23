@@ -234,7 +234,7 @@ defmodule FileConfig.Loader do
   end
 
   @doc "Create table if new/update"
-  @spec maybe_create_table(name, :calendar.datetime, map) :: :ets.tid
+  @spec maybe_create_table(name(), :calendar.datetime(), map()) :: :ets.tid()
   def maybe_create_table(name, mod, config) do
     case :ets.lookup(__MODULE__, name) do
       [] ->
@@ -249,10 +249,11 @@ defmodule FileConfig.Loader do
     end
   end
 
-  @spec create_ets_table(map) :: :ets.tid
+  @spec create_ets_table(map()) :: :ets.tid()
   def create_ets_table(%{name: name, ets_opts: ets_opts}) do
     :ets.new(name, ets_opts)
   end
+
   def create_ets_table(%{name: name}) do
     :ets.new(name, [:set, :public, {:read_concurrency, true}, {:write_concurrency, true}])
   end
@@ -282,7 +283,7 @@ defmodule FileConfig.Loader do
     old_tables
   end
 
-  @spec delete_tables(list(:ets.tab)) :: :ok
+  @spec delete_tables(list(:ets.tab())) :: :ok
   def delete_tables(tables) do
     for {name, tid} <- tables do
       Logger.debug("Deleting old ETS table: #{inspect name} #{inspect tid}")
