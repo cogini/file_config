@@ -257,19 +257,20 @@ defmodule FileConfig.Loader do
     :ets.new(name, [:set, :public, {:read_concurrency, true}, {:write_concurrency, true}])
   end
 
-  @spec update_table_index([table_state]) :: [:ets.tid]
+  @spec update_table_index([table_state()]) :: [:ets.tid()]
   def update_table_index(new_tables) do
     # Get ids of tables which already exist and we are replacing
-    old_tables = Enum.reduce(new_tables, [], fn(%{name: name}, acc) ->
-      case :ets.lookup(__MODULE__, name) do
-        [] ->
-          # Logger.debug("ETS new_table: #{name}")
-          acc
-        [{_name, %{id: tid}}] ->
-          # Logger.debug("ETS old_table: #{name} #{inspect tid}")
-          [{name, tid} | acc]
-      end
-    end)
+    old_tables = Enum.reduce(new_tables, [],
+      fn %{name: name}, acc ->
+        case :ets.lookup(__MODULE__, name) do
+          [] ->
+            # Logger.debug("ETS new_table: #{name}")
+            acc
+          [{_name, %{id: tid}}] ->
+            # Logger.debug("ETS old_table: #{name} #{inspect tid}")
+            [{name, tid} | acc]
+        end
+      end)
 
     # Update index with ids of current tables
     table_tuples = for %{name: name} = table <- new_tables, do: {name, table}
