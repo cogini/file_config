@@ -12,7 +12,7 @@ defmodule FileConfig do
   # Public API
 
   @doc "Read value from named table"
-  @spec read(name, term) :: :undefined | {:ok, term}
+  @spec read(name(), term()) :: :undefined | {:ok, term()}
   def read(name, key) do
     case table_info(name) do
       :undefined ->

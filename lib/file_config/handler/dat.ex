@@ -42,7 +42,7 @@ defmodule FileConfig.Handler.Dat do
       Logger.info("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
     end
 
-    Loader.make_table_state(name, update, tid)
+    Loader.make_table_state(__MODULE__, name, update, tid)
   end
 
   # @impl true

@@ -254,9 +254,9 @@ defmodule FileConfig.Loader do
 
   # Create table_sate data
   @spec make_table_state(name(), map(), :ets.tid()) :: table_state()
-  def make_table_state(name, update, tid) do
+  def make_table_state(handler, name, update, tid) do
     %{config: config, mod: mod} = update
-    Map.merge(%{name: name, id: tid, mod: mod, handler: __MODULE__},
+    Map.merge(%{name: name, id: tid, mod: mod, handler: handler},
       Map.take(config, [:lazy_parse, :parser, :parser_opts]))
   end
 
