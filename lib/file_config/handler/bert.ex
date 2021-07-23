@@ -9,11 +9,12 @@ defmodule FileConfig.Handler.Bert do
   @type nrecs :: {namespace, [tuple]}
 
   # @impl true
-  @spec lookup(Loader.table_state, term) :: term
+  @spec lookup(Loader.table_state(), term()) :: term()
   def lookup(%{id: tid, name: name, lazy_parse: true, parser: parser} = state, key) do
     parser_opts = state[:parser_opts] || []
     case :ets.lookup(tid, key) do
-      [] -> :undefined
+      [] ->
+        :undefined
       [{_key, bin}] when is_binary(bin) ->
         case parser.decode(bin, parser_opts) do
           {:ok, value} ->
@@ -38,16 +39,22 @@ defmodule FileConfig.Handler.Bert do
 
   # @impl true
   @spec load_update(Loader.name(), Loader.update(), :ets.tab(), Loader.update()) :: Loader.table_state()
-  def load_update(name, update, tid, _prev) do
-    # Assume updated files contain all records
-    {path, _state} = hd(update.files)
+  def load_update(name, update, tid, prev) do
     config = update.config
 
-    # TODO: handle parse errors
+    files =
+      update
+      |> Loader.changed_files?(prev)
+      |> Loader.latest_file?()
+      # Files stored latest first, process in chronological order
+      |> Enum.reverse()
 
-    Logger.debug("Loading #{name} #{config.format} #{path}")
-    {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
-    Logger.info("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
+    for {path, state} <- files do
+      Logger.debug("Loading #{name} #{config.format} #{path} #{inspect(state.mod)}")
+      {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
+      # TODO: handle parse errors
+      Logger.info("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
+    end
 
     Map.merge(%{name: name, id: tid, mod: update.mod, handler: __MODULE__},
       Map.take(config, [:lazy_parse, :parser, :parser_opts]))

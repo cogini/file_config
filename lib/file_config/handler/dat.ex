@@ -27,14 +27,21 @@ defmodule FileConfig.Handler.Dat do
 
   # @impl true
   @spec load_update(Loader.name(), Loader.update(), :ets.tid(), Loader.update()) :: Loader.table_state()
-  def load_update(name, update, tid, _prev) do
-    # Assume updated files contain all records
-    {path, _state} = hd(update.files)
+  def load_update(name, update, tid, prev) do
     config = update.config
 
-    Logger.debug("Loading #{name} #{config.format} #{path}")
-    {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
-    Logger.info("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
+    files =
+      update
+      |> Loader.changed_files?(prev)
+      |> Loader.latest_file?()
+      # Files stored latest first, process in chronological order
+      |> Enum.reverse()
+
+    for {path, state} <- files do
+      Logger.debug("Loading #{name} #{config.format} #{path} #{inspect(state.mod)}")
+      {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
+      Logger.info("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
+    end
 
     %{name: name, id: tid, mod: update.mod, handler: __MODULE__}
   end
