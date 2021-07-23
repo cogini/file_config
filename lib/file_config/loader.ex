@@ -244,10 +244,11 @@ defmodule FileConfig.Loader do
   @doc "Load data from files"
   @spec process_files(files(), files()) :: list(table_state())
   def process_files(new_files, old_files) do
-    for name <- Map.keys(new_files) do
-      update = new_files[name]
+    for {name, update} <- new_files do
+      Logger.debug("#{name}: #{inspect(update)}")
       config = update.config
       tid = maybe_create_table(name, update.mod, config)
+      Logger.debug("#{name}: #{inspect(tid)}")
       config.handler.load_update(name, update, tid, old_files[name])
     end
   end
