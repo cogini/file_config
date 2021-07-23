@@ -212,11 +212,11 @@ defmodule FileConfig.Loader do
           # Get files that have been modified since last time
             mod_files = for {_p, %{mod: mod}} = f <- v.files, mod > prev_mod, do: f
             # TODO: check for empty not length
-            if length(mod_files) > 0 do
-            # Map.put(acc, name, %{v | files: mod_files}) # only modified files
-              Map.put(acc, name, v) # keep all files
-            else
+            if Enum.empty?(mod_files) do
               acc
+            else
+              # Map.put(acc, name, %{v | files: mod_files}) # only modified files
+                Map.put(acc, name, v) # keep all files
             end
         end
       end)
