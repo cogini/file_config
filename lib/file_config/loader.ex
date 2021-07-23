@@ -248,7 +248,7 @@ defmodule FileConfig.Loader do
       update = new_files[name]
       config = update.config
       tid = maybe_create_table(name, update.mod, config)
-      config.handler.process_update(name, tid, update, old_files[name])
+      config.handler.load_update(name, tid, update, old_files[name])
     end
   end
 
