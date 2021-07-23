@@ -27,6 +27,9 @@ defmodule FileConfig.Loader do
     data_dirs = args[:data_dirs] || []
 
     file_configs = process_file_configs(args[:files] || [])
+    for file_config <- file_configs do
+      Logger.info("config: #{inspect(file_config)}")
+    end
 
     # How often to check for new files, in ms
     check_delay = args[:check_delay] || 5000
@@ -36,7 +39,6 @@ defmodule FileConfig.Loader do
     free_binary_memory()
 
     state = %{
-      ref: :erlang.start_timer(check_delay, self(), :reload),
       old_tables: old_tables,
       files: new_files,
       file_configs: file_configs,
@@ -44,20 +46,20 @@ defmodule FileConfig.Loader do
       check_delay: check_delay,
     }
 
-    {:ok, state}
+    {:ok, state, check_delay}
   end
 
   @impl true
   @spec handle_info(term(), map()) :: {:noreply, map()}
-  def handle_info({:timeout, ref, :reload}, state) do
-    %{ref: ^ref, files: files, old_tables: old_old_tables} = state # TODO check ref matching
+  def handle_info(:timeout, state) do
+    # %{ref: ^ref, files: files, old_tables: old_old_tables} = state # TODO check ref matching
+    %{files: files, old_tables: old_old_tables} = state # TODO check ref matching
     {old_tables, new_files} = check_files(files, state)
     delete_tables(old_old_tables)
 
     free_binary_memory()
 
-    {:noreply, %{state | ref: :erlang.start_timer(state.check_delay, self(), :reload),
-      files: new_files, old_tables: old_tables}}
+    {:noreply, %{state | files: new_files, old_tables: old_tables}, state.check_delay}
   end
 
   def handle_info(msg, state) do
@@ -71,26 +73,34 @@ defmodule FileConfig.Loader do
   @doc "Check for changes to configured files"
   @spec check_files(files(), map()) :: {[:ets.tid()], files()}
   def check_files(old_files, state, init \\ false) do
-    # Logger.debug("init: #{init}")
     new_files = get_files(state.data_dirs, state.file_configs, init)
-    # for {name, value} <- new_files do
-    #   Logger.warning("new_files: #{name} #{inspect(value)}")
-    # end
 
-    new_tables = process_files(new_files, old_files)
-
-    old_tables = update_table_index(new_tables)
+    new_tables =
+      for {name, update} <- new_files,
+          {:ok, prev} = get_prev(name, old_files),
+          modified?(name, update, prev)
+      do
+        tid = maybe_create_table(update)
+        config = update.config
+        config.handler.load_update(name, update, tid, prev)
+      end
 
     notify_update(new_tables)
 
+    old_tables = update_table_index(new_tables)
+
     {old_tables, new_files}
   end
+
+  defp get_prev(name, old_files)
+  defp get_prev(_name, nil), do: {:ok, nil}
+  defp get_prev(name, old_files), do: {:ok, old_files[name]}
 
   @doc "Set config defaults"
   @spec process_file_configs(list({name(), map()})) :: list(file_config())
   def process_file_configs(files) do
     for {config_name, config} <- files do
-      Logger.info("Loading #{config_name} #{inspect config}")
+      # Logger.info("Loading config #{config_name} #{inspect(config)}")
 
       # Name of table
       name = config[:name] || config_name
@@ -145,9 +155,9 @@ defmodule FileConfig.Loader do
         {:ok, stat} = File.stat(path),
         stat.size > 0, do: {path, config, %{mod: stat.mtime}}
 
-    for {path, config, mtime} <- files do
-      Logger.debug("file: #{inspect(path)} #{inspect(config)} #{inspect(mtime)}")
-    end
+    # for {path, config, mtime} <- files do
+    #   Logger.debug("file: #{inspect(path)} #{inspect(config)} #{inspect(mtime)}")
+    # end
 
     files
     |> Enum.reduce(%{}, &group_by_name/2)
@@ -229,70 +239,116 @@ defmodule FileConfig.Loader do
   def latest_file?(%{config: %{update: :latest}} = update), do: [hd(update.files)]
   def latest_file?(update), do: update.files
 
-  @doc "Load data from changed files"
-  @spec process_changed_files(files()) :: list(table_state())
-  def process_changed_files(changed_files) do
-    for {name, update} <- changed_files do
-      config = update.config
-      tid = maybe_create_table(name, update.mod, config)
-      Logger.debug("Loading file #{name}")
-      config.handler.load_update(name, update, tid)
-    end
+  # @doc "Load data from changed files"
+  # @spec process_changed_files(files()) :: list(table_state())
+  # def process_changed_files(changed_files) do
+  #   for {name, update} <- changed_files do
+  #     config = update.config
+  #     tid = maybe_create_table(name, update.mod, config)
+  #     Logger.debug("Loading file #{name}")
+  #     config.handler.load_update(name, update, tid)
+  #   end
+  # end
+  #   # changed_files = get_changed_files(new_files, old_files)
+  #   # new_tables = process_changed_files(changed_files)
+
+  # Create table_sate data
+  @spec make_table_state(name(), map(), :ets.tid()) :: table_state()
+  def make_table_state(name, update, tid) do
+    %{config: config, mod: mod} = update
+    Map.merge(%{name: name, id: tid, mod: mod, handler: __MODULE__},
+      Map.take(config, [:lazy_parse, :parser, :parser_opts]))
   end
-    # changed_files = get_changed_files(new_files, old_files)
-    # new_tables = process_changed_files(changed_files)
 
   @doc "Load data from files"
   @spec process_files(files(), files()) :: list(table_state())
   def process_files(new_files, old_files) do
     for {name, update} <- new_files do
-      Logger.debug("#{name}: #{inspect(update)}")
+      prev = old_files[name]
+      Logger.debug("#{name}: #{inspect(update)} #{inspect(prev)}")
+
       config = update.config
-      tid = maybe_create_table(name, update.mod, config)
-      Logger.debug("#{name}: #{inspect(tid)}")
-      config.handler.load_update(name, update, tid, old_files[name])
+      tid = maybe_create_table(update)
+
+      if modified?(name, update, prev) do
+        config.handler.load_update(name, update, tid, prev)
+
+        FileConfig.EventProducer.sync_notify({:load, name})
+      end
+
     end
   end
 
+  @doc "Whether files have been modified/created since last run"
+  @spec modified?(map) :: boolean()
+  def modified?(%{name: name, update: update, prev: prev}) do
+    modified?(name, update, prev)
+  end
+
+  @spec modified?(name(), map(), map()) :: boolean()
+  def modified?(name, update, prev)
+
+  def modified?(_name, %{mod: update_mod}, %{mod: prev_mod}) when update_mod == prev_mod do
+    # Logger.debug("#{name}: Files not modified")
+    false
+  end
+
+  def modified?(name, _ , _) do
+    Logger.debug("#{name}: Files modified")
+    true
+  end
+
+
   @doc "Create table if new/update"
-  @spec maybe_create_table(name(), :calendar.datetime(), map()) :: :ets.tid()
-  def maybe_create_table(name, mod, config) do
+  def maybe_create_table(update) do
+    maybe_create_table(update.mod, update.config)
+  end
+
+  @spec maybe_create_table(:calendar.datetime(), map()) :: :ets.tid()
+  def maybe_create_table(mod, config) do
+    name = config.name
     case :ets.lookup(__MODULE__, name) do
       [] ->
-        Logger.debug("Creating ETS table #{name} new")
-        create_ets_table(config)
+        tid = create_ets_table(config)
+        Logger.debug("Created ETS table #{name} new #{inspect(tid)}")
+        tid
       [{_name, %{id: tid, mod: m}}] when m == mod ->
         Logger.debug("Using existing ETS table #{name} #{inspect(tid)}")
         tid
       [{_name, %{}}] ->
-        Logger.debug("Creating ETS table #{name} update")
-        create_ets_table(config)
+        tid = create_ets_table(config)
+        Logger.debug("Created ETS table #{name} update #{inspect(tid)}")
+        tid
     end
   end
 
   @spec create_ets_table(map()) :: :ets.tid()
   def create_ets_table(%{name: name, ets_opts: ets_opts}) do
+    Logger.debug("Creating ETS table with opts #{inspect(ets_opts)}")
     :ets.new(name, ets_opts)
   end
 
   def create_ets_table(%{name: name}) do
-    :ets.new(name, [:set, :public, {:read_concurrency, true}, {:write_concurrency, true}])
+    ets_opts = [:set, :public, {:read_concurrency, true}, {:write_concurrency, true}]
+    Logger.debug("Creating ETS table with default opts #{inspect(ets_opts)}")
+    :ets.new(name, ets_opts)
   end
 
   @spec update_table_index([table_state()]) :: [:ets.tid()]
   def update_table_index(new_tables) do
     # Get ids of tables which already exist and we are replacing
-    old_tables = Enum.reduce(new_tables, [],
-      fn %{name: name}, acc ->
-        case :ets.lookup(__MODULE__, name) do
-          [] ->
-            Logger.debug("ETS new_table: #{name}")
-            acc
-          [{_name, %{id: tid}}] ->
-            Logger.debug("ETS old_table: #{name} #{inspect tid}")
-            [{name, tid} | acc]
-        end
-      end)
+    old_tables =
+      Enum.reduce(new_tables, [],
+        fn %{name: name}, acc ->
+          case :ets.lookup(__MODULE__, name) do
+            [] ->
+              Logger.debug("ETS new table: #{name}")
+              acc
+            [{_name, %{id: tid}}] ->
+              Logger.debug("ETS old table: #{name} #{inspect(tid)}")
+              [{name, tid} | acc]
+          end
+        end)
 
     # Update index with ids of current tables
     table_tuples = for %{name: name} = table <- new_tables, do: {name, table}
@@ -307,7 +363,7 @@ defmodule FileConfig.Loader do
   @spec delete_tables(list(:ets.tab())) :: :ok
   def delete_tables(tables) do
     for {name, tid} <- tables do
-      Logger.debug("Deleting old ETS table: #{inspect name} #{inspect tid}")
+      Logger.debug("Deleting ETS table: #{inspect(name)} #{inspect(tid)}")
       :ets.delete(tid)
     end
     :ok

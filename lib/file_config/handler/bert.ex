@@ -5,10 +5,9 @@ defmodule FileConfig.Handler.Bert do
 
   alias FileConfig.Loader
 
-  @type namespace :: atom
-  @type nrecs :: {namespace, [tuple]}
+  @type namespace :: atom()
+  @type nrecs :: {namespace(), [tuple()]}
 
-  # @impl true
   @spec lookup(Loader.table_state(), term()) :: term()
   def lookup(%{id: tid, name: name, lazy_parse: true, parser: parser} = state, key) do
     parser_opts = state[:parser_opts] || []
@@ -29,6 +28,7 @@ defmodule FileConfig.Handler.Bert do
         {:ok, value}
     end
   end
+
   def lookup(%{id: tid}, key) do
     case :ets.lookup(tid, key) do
       [] -> :undefined
@@ -56,19 +56,18 @@ defmodule FileConfig.Handler.Bert do
       Logger.info("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
     end
 
-    Map.merge(%{name: name, id: tid, mod: update.mod, handler: __MODULE__},
-      Map.take(config, [:lazy_parse, :parser, :parser_opts]))
+    Loader.make_table_state(name, update, tid)
   end
 
   # @impl true
-  @spec insert_records(Loader.table_state, {term, term} | [{term, term}]) :: true
+  @spec insert_records(Loader.table_state(), {term(), term()} | [{term(), term()}]) :: true
   def insert_records(state, records) do
     :ets.insert(state.id, records)
   end
 
   # Internal functions
 
-  @spec parse_file(Path.t, :ets.tab, map) :: {:ok, non_neg_integer}
+  @spec parse_file(Path.t(), :ets.tab(), map()) :: {:ok, non_neg_integer()}
   def parse_file(path, tid, config) do
     {:ok, bin} = File.read(path)
     {:ok, terms} = decode(bin)
@@ -83,7 +82,7 @@ defmodule FileConfig.Handler.Bert do
     {:ok, length(records)}
   end
 
-  @spec decode(binary) :: {:ok, term} | {:error, term}
+  @spec decode(binary()) :: {:ok, term()} | {:error, term()}
   def decode(bin) when is_binary(bin) do
     try do
       {:ok, :erlang.binary_to_term(bin)}
@@ -93,9 +92,11 @@ defmodule FileConfig.Handler.Bert do
     end
   end
 
-  @spec parse_records(list({atom, list}) | {atom, list}, map) :: {atom, list}
+  @spec parse_records(list({atom(), list()}) | {atom(), list()}, map()) :: {atom(), list()}
   defp parse_records([recs], config), do: parse_records(recs, config)
+
   defp parse_records(recs, %{lazy_parse: true}), do: recs
+
   defp parse_records({name, recs}, %{parser: parser} = config) do
     parser_opts = config[:parser_opts] || []
 
@@ -110,11 +111,12 @@ defmodule FileConfig.Handler.Bert do
     end
     {name, values}
   end
+
   defp parse_records(recs, _), do: recs
 
   # Validate data to make sure it matches the format
   # [{Namespace::atom(), [{Key, Val}]}]
-  @spec validate({atom, list(term)}) :: {atom, list(term)} | :no_return
+  @spec validate({atom(), list(term())}) :: {atom(), list(term())} | :no_return
   def validate({name, records} = u) when is_atom(name) and is_list(records), do: u
   def validate(_), do: throw(:bad_config_format)
 end

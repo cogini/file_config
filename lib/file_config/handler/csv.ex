@@ -64,15 +64,7 @@ defmodule FileConfig.Handler.Csv do
       Logger.info("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
     end
 
-    Map.merge(
-      %{
-        name: name,
-        id: tid,
-        mod: update.mod,
-        handler: __MODULE__,
-      },
-      Map.take(config, [:lazy_parse, :parser, :parser_opts])
-    )
+    Loader.make_table_state(name, update, tid)
   end
 
   @spec insert_records(Loader.table_state(), {term(), term()} | [{term(), term()}]) :: true

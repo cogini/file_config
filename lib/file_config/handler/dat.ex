@@ -5,8 +5,7 @@ defmodule FileConfig.Handler.Dat do
 
   alias FileConfig.Loader
 
-  # @impl true
-  @spec lookup(Loader.table_state, term) :: term
+  @spec lookup(Loader.table_state(), term()) :: term()
   def lookup(%{id: tid, name: name, lazy_parse: true, data_parser: data_parser}, key) do
     case :ets.lookup(tid, key) do
       [] -> :undefined
@@ -17,6 +16,7 @@ defmodule FileConfig.Handler.Dat do
         {:ok, parsed_value}
     end
   end
+
   def lookup(%{id: tid}, key) do
     case :ets.lookup(tid, key) do
       [] -> :undefined
@@ -25,7 +25,6 @@ defmodule FileConfig.Handler.Dat do
     end
   end
 
-  # @impl true
   @spec load_update(Loader.name(), Loader.update(), :ets.tid(), Loader.update()) :: Loader.table_state()
   def load_update(name, update, tid, prev) do
     config = update.config
@@ -43,7 +42,7 @@ defmodule FileConfig.Handler.Dat do
       Logger.info("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
     end
 
-    %{name: name, id: tid, mod: update.mod, handler: __MODULE__}
+    Loader.make_table_state(name, update, tid)
   end
 
   # @impl true
