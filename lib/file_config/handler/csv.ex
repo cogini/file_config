@@ -6,7 +6,6 @@ defmodule FileConfig.Handler.Csv do
   alias FileConfig.Loader
   alias FileConfig.Lib
 
-  # @impl true
   @spec lookup(Loader.table_state(), term()) :: term()
   def lookup(%{id: tid, name: name, lazy_parse: true, parser: parser} = state, key) do
     parser_opts = state[:parser_opts] || []
@@ -42,18 +41,27 @@ defmodule FileConfig.Handler.Csv do
     end
   end
 
-  # @impl true
-  @spec load_update(Loader.name(), Loader.update(), :ets.tid()) :: Loader.table_state()
-  def load_update(name, update, tid) do
-    # Assume updated files contain all records
-    {path, _state} = hd(update.files)
+  # @spec load_update(Loader.name(), Loader.update(), :ets.tid()) :: Loader.table_state()
+  # def load_update(name, update, tid) do
+  #   load_update(name, update, tid, nil)
+  # end
+
+  @spec load_update(Loader.name(), Loader.update(), :ets.tid(), Loader.update() | nil) :: Loader.table_state()
+  def load_update(name, update, tid, prev) do
     config = update.config
 
-    # TODO: handle parse errors
+    files =
+      update
+      |> Loader.changed_files?(prev)
+      |> Loader.latest_file?()
+      # Files stored latest first, process in chronological order
+      |> Enum.reverse()
 
-    Logger.debug("Loading #{name} #{config.format} #{path}")
-    {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
-    Logger.info("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
+    for {path, state} <- files do
+      Logger.debug("Loading #{name} #{config.format} #{path} #{inspect(state.mod)}")
+      {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
+      Logger.info("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
+    end
 
     Map.merge(
       %{
@@ -66,7 +74,6 @@ defmodule FileConfig.Handler.Csv do
     )
   end
 
-  # @impl true
   @spec insert_records(Loader.table_state(), {term(), term()} | [{term(), term()}]) :: true
   def insert_records(state, records) do
     :ets.insert(state.id, records)

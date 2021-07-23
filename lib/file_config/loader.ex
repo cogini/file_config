@@ -77,15 +77,7 @@ defmodule FileConfig.Loader do
     #   Logger.warning("new_files: #{name} #{inspect(value)}")
     # end
 
-    changed_files = get_changed_files(new_files, old_files)
-    # for {name, value} <- changed_files do
-    #   Logger.error("changed_file: #{name} #{inspect value}")
-    # end
-
-    new_tables = process_changed_files(changed_files)
-    # for new_table <- new_tables do
-    #   Logger.debug("new_table: #{inspect new_table}")
-    # end
+    new_tables = process_files(new_files, old_files)
 
     old_tables = update_table_index(new_tables)
 
@@ -209,7 +201,7 @@ defmodule FileConfig.Loader do
           :error -> # New file
             Map.put(acc, name, v)
           {:ok, %{mod: prev_mod}} -> # Existing file
-          # Get files that have been modified since last time
+            # Get files that have been modified since last time
             mod_files = for {_p, %{mod: mod}} = f <- v.files, mod > prev_mod, do: f
             # TODO: check for empty not length
             if Enum.empty?(mod_files) do
@@ -222,6 +214,20 @@ defmodule FileConfig.Loader do
       end)
   end
 
+  @doc "Get just changed files or all based on config"
+  @spec changed_files?(map(), map()) :: map()
+  def changed_files?(update, prev)
+  def changed_files?(update, nil), do: update
+  def changed_files?(%{config: %{changed: true}} = update, %{mod: prev_mod}) do
+    files = for {_p, %{mod: mod}} = f <- update.files, mod > prev_mod, do: f
+    %{update | files: files}
+  end
+
+  @doc "Get latest file or all based on config"
+  @spec latest_file?(map()) :: list({Path.t(), map()})
+  def latest_file?(%{config: %{update: :latest}} = update), do: [hd(update.files)]
+  def latest_file?(update), do: update.files
+
   @doc "Load data from changed files"
   @spec process_changed_files(files()) :: list(table_state())
   def process_changed_files(changed_files) do
@@ -230,6 +236,19 @@ defmodule FileConfig.Loader do
       tid = maybe_create_table(name, update.mod, config)
       Logger.debug("Loading file #{name}")
       config.handler.load_update(name, update, tid)
+    end
+  end
+    # changed_files = get_changed_files(new_files, old_files)
+    # new_tables = process_changed_files(changed_files)
+
+  @doc "Load data from files"
+  @spec process_files(files(), files()) :: list(table_state())
+  def process_files(new_files, old_files) do
+    for name <- Map.keys(new_files) do
+      update = new_files[:name]
+      config = update.config
+      tid = maybe_create_table(name, update.mod, config)
+      config.handler.process_update(name, tid, update, old_files[name])
     end
   end
 
