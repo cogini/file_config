@@ -245,7 +245,7 @@ defmodule FileConfig.Loader do
   @spec process_files(files(), files()) :: list(table_state())
   def process_files(new_files, old_files) do
     for name <- Map.keys(new_files) do
-      update = new_files[:name]
+      update = new_files[name]
       config = update.config
       tid = maybe_create_table(name, update.mod, config)
       config.handler.process_update(name, tid, update, old_files[name])
