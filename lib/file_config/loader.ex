@@ -217,7 +217,8 @@ defmodule FileConfig.Loader do
   @doc "Get just changed files or all based on config"
   @spec changed_files?(map(), map()) :: map()
   def changed_files?(update, prev)
-  def changed_files?(%{config: %{changed: true}} = update, %{mod: prev_mod}) do
+  def changed_files?(%{config: %{changed: false}} = update, _), do: update
+  def changed_files?(update, %{mod: prev_mod}) do
     files = for {_p, %{mod: mod}} = f <- update.files, mod > prev_mod, do: f
     %{update | files: files}
   end
