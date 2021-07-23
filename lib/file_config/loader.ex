@@ -217,11 +217,11 @@ defmodule FileConfig.Loader do
   @doc "Get just changed files or all based on config"
   @spec changed_files?(map(), map()) :: map()
   def changed_files?(update, prev)
-  def changed_files?(update, nil), do: update
   def changed_files?(%{config: %{changed: true}} = update, %{mod: prev_mod}) do
     files = for {_p, %{mod: mod}} = f <- update.files, mod > prev_mod, do: f
     %{update | files: files}
   end
+  def changed_files?(update, _), do: update
 
   @doc "Get latest file or all based on config"
   @spec latest_file?(map()) :: list({Path.t(), map()})
