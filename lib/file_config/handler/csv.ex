@@ -27,6 +27,7 @@ defmodule FileConfig.Handler.Csv do
         end
 
       [{_key, value}] ->
+        # Cached result
         {:ok, value}
     end
   end
