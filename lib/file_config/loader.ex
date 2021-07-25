@@ -106,7 +106,7 @@ defmodule FileConfig.Loader do
       name = config[:name] || config_name
 
       # Pattern matching input files
-      file = config.file
+      file = config[:file]
       regex = config[:regex] || "/#{file}$"
       regex = Regex.compile!(regex)
 
