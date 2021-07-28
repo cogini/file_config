@@ -17,6 +17,7 @@ defmodule FileConfig do
     case table_info(name) do
       :undefined ->
         :undefined
+
       %{handler: handler} = table_state ->
         handler.lookup(table_state, key)
       # %{id: tid} -> # fallback
@@ -35,6 +36,7 @@ defmodule FileConfig do
       :undefined ->
         Logger.warn("Unkown table #{name}")
         true
+
       %{handler: handler} = table_state ->
         handler.insert_records(table_state, records)
     end
@@ -57,6 +59,7 @@ defmodule FileConfig do
       :undefined ->
         Logger.warn("Unkown table #{name}")
         true
+
       %{handler: _handler} = table_state ->
         # TODO: This should call flush on handler
         # handler.flush(table_state)
