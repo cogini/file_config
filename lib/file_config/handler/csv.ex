@@ -83,12 +83,8 @@ defmodule FileConfig.Handler.Csv do
     # Logger.warning("File: #{path}")
     {tread, {:ok, bin}} = :timer.tc(File, :read, [path])
     {tparse, r} = :timer.tc(:file_config_csv2, :pparse, [bin, parser_processes, evt, 0])
-    num_records = Enum.reduce(r, 0, fn x, a -> a + x end)
-
-    Logger.debug(
-      "Loaded #{config.format} #{path} read #{tread / 1_000_000} parse #{tparse / 1_000_000}"
-    )
-
+    num_records = Enum.reduce(r, 0, &(&1 + &2))
+    Logger.debug(fn -> "Loaded #{config.format} #{path} read #{tread / 1_000_000} parse #{tparse / 1_000_000}" end)
     {:ok, num_records}
   end
 
@@ -169,6 +165,18 @@ defmodule FileConfig.Handler.Csv do
       # Called after parsing shard
       :eof, acc ->
         acc
+    end
+  end
+
+  defp parse_int(""), do: 0
+
+  defp parse_int(bin) do
+    case Integer.parse(bin) do
+      {value, _tail} ->
+        value
+
+      :error ->
+        0
     end
   end
 end
