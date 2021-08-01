@@ -12,6 +12,7 @@ defmodule FileConfig.Application do
       {FileConfig.EventProducer, []},
       # {FileConfig.EventConsumer, []},
       {FileConfig.Loader, [
+        state_dir: Application.get_env(@app, :state_dir),
         files: Application.get_env(@app, :files, []),
         data_dirs: Application.get_env(@app, :data_dirs, []),
         check_delay: Application.get_env(@app, :check_delay, 5000)

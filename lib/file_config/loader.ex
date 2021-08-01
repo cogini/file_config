@@ -26,10 +26,10 @@ defmodule FileConfig.Loader do
     # Directories to look for files in
     data_dirs = args[:data_dirs] || []
 
-    file_configs = process_file_configs(args[:files] || [])
-    for file_config <- file_configs do
-      Logger.info("config: #{inspect(file_config)}")
-    end
+    {:ok, file_configs} = init_config(args)
+    # for file_config <- file_configs do
+    #   Logger.info("config: #{inspect(file_config)}")
+    # end
 
     # How often to check for new files, in ms
     check_delay = args[:check_delay] || 5000
@@ -85,6 +85,10 @@ defmodule FileConfig.Loader do
         config.handler.load_update(name, update, tid, prev)
       end
 
+    for table <- new_tables do
+      Logger.debug("table_state: #{inspect(table)}")
+    end
+
     notify_update(new_tables)
 
     old_tables = update_table_index(new_tables)
@@ -97,31 +101,42 @@ defmodule FileConfig.Loader do
   defp get_prev(name, old_files), do: {:ok, old_files[name]}
 
   @doc "Set config defaults"
-  @spec process_file_configs(list({name(), map()})) :: list(file_config())
-  def process_file_configs(files) do
-    for {config_name, config} <- files do
-      # Logger.info("Loading config #{config_name} #{inspect(config)}")
+  @spec init_config(Keyword.t()) :: {:ok, list(file_config())}
+  def init_config(args) do
+    files = args[:files] || []
+    state_dir = args[:state_dir]
 
-      # Name of table
-      name = config[:name] || config_name
+    results =
+      for {config_name, config} <- files do
+        # Logger.info("Loading config #{config_name} #{inspect(config)}")
 
-      # Pattern matching input files
-      file = config[:file]
-      regex = config[:regex] || "/#{file}$"
-      regex = Regex.compile!(regex)
+        # Name of table
+        name = config[:name] || config_name
 
-      format = config[:format] || ext_to_format(Path.extname(file))
+        # Pattern matching input files
+        file = config[:file]
+        regex = config[:regex] || "/#{file}$"
+        regex = Regex.compile!(regex)
 
-      # Module to handle file
-      handler = config[:handler] || format_to_handler(format)
+        format = config[:format] || ext_to_format(Path.extname(file))
 
-      Map.merge(config, %{
-        name: name,
-        format: format,
-        handler: handler,
-        regex: regex,
-      })
-    end
+        # Module to handle file
+        handler = config[:handler] || format_to_handler(format)
+
+        derived_config = %{
+          state_dir: state_dir,
+          name: name,
+          format: format,
+          handler: handler,
+          regex: regex,
+        }
+
+        config = Map.merge(config, derived_config)
+        {:ok, config} = handler.init_config(config, args)
+        config
+      end
+
+    {:ok, results}
   end
 
   @doc "Find files matching pattern."
@@ -261,24 +276,24 @@ defmodule FileConfig.Loader do
       Map.take(config, [:lazy_parse, :parser, :parser_opts]))
   end
 
-  @doc "Load data from files"
-  @spec process_files(files(), files()) :: list(table_state())
-  def process_files(new_files, old_files) do
-    for {name, update} <- new_files do
-      prev = old_files[name]
-      Logger.debug("#{name}: #{inspect(update)} #{inspect(prev)}")
-
-      config = update.config
-      tid = maybe_create_table(update)
-
-      if modified?(name, update, prev) do
-        config.handler.load_update(name, update, tid, prev)
-
-        FileConfig.EventProducer.sync_notify({:load, name})
-      end
-
-    end
-  end
+  # @doc "Load data from files"
+  # @spec process_files(files(), files()) :: list(table_state())
+  # def process_files(new_files, old_files) do
+  #   for {name, update} <- new_files do
+  #     prev = old_files[name]
+  #     Logger.debug("#{name}: #{inspect(update)} #{inspect(prev)}")
+  #
+  #     config = update.config
+  #     tid = maybe_create_table(update)
+  #
+  #     if modified?(name, update, prev) do
+  #       config.handler.load_update(name, update, tid, prev)
+  #
+  #       FileConfig.EventProducer.sync_notify({:load, name})
+  #     end
+  #
+  #   end
+  # end
 
   @doc "Whether files have been modified/created since last run"
   @spec modified?(map) :: boolean()

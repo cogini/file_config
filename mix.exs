@@ -59,8 +59,11 @@ defmodule FileConfig.MixProject do
       {:excoveralls, "~> 0.14.0", only: [:dev, :test], runtime: false},
       {:file_config_rocksdb, github: "cogini/file_config_rocksdb"},
       # {:file_config_rocksdb, path: "../file_config_rocksdb"},
+      {:file_config_sqlite, github: "cogini/file_config_sqlite"},
+      # {:file_config_sqlite, path: "../file_config_sqlite"},
       {:gen_stage, "~> 1.0"},
       {:jason, "~> 1.2"},
+      {:murmur, "~> 1.0"},
       {:recon, "~> 2.5", override: true},
     ]
   end

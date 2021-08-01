@@ -8,37 +8,46 @@ defmodule FileConfig.Handler.Bert do
   @type namespace :: atom()
   @type nrecs :: {namespace(), [tuple()]}
 
+  @spec init_config(map(), Keyword.t()) :: {:ok, map()} | {:error, term()}
+  def init_config(config, _args), do: {:ok, config}
+
   @spec lookup(Loader.table_state(), term()) :: term()
-  def lookup(%{id: tid, name: name, lazy_parse: true, parser: parser} = state, key) do
+  def lookup(%{id: tid, name: name, config: %{lazy_parse: true, parser: parser}} = state, key) do
     parser_opts = state[:parser_opts] || []
+
     case :ets.lookup(tid, key) do
       [] ->
         :undefined
+
       [{_key, bin}] when is_binary(bin) ->
         case parser.decode(bin, parser_opts) do
           {:ok, value} ->
             # Cache parsed value
             true = :ets.insert(tid, [{key, value}])
             {:ok, value}
+
           {:error, reason} ->
-            Logger.debug("Error parsing table #{name} key #{key}: #{inspect reason}")
+            Logger.debug("Error parsing table #{name} key #{key}: #{inspect(reason)}")
             {:ok, bin}
         end
+
       [{_key, value}] ->
+        # Cached result
         {:ok, value}
     end
   end
 
   def lookup(%{id: tid}, key) do
     case :ets.lookup(tid, key) do
-      [] -> :undefined
+      [] ->
+        :undefined
+
       [{_key, value}] ->
         {:ok, value}
     end
   end
 
-  # @impl true
-  @spec load_update(Loader.name(), Loader.update(), :ets.tab(), Loader.update()) :: Loader.table_state()
+  @spec load_update(Loader.name(), Loader.update(), :ets.tid(), Loader.update()) :: Loader.table_state()
   def load_update(name, update, tid, prev) do
     config = update.config
 
@@ -51,15 +60,14 @@ defmodule FileConfig.Handler.Bert do
 
     for {path, state} <- files do
       Logger.debug("Loading #{name} #{config.format} #{path} #{inspect(state.mod)}")
-      {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
       # TODO: handle parse errors
+      {time, {:ok, rec}} = :timer.tc(&parse_file/3, [path, tid, config])
       Logger.info("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
     end
 
     Loader.make_table_state(__MODULE__, name, update, tid)
   end
 
-  # @impl true
   @spec insert_records(Loader.table_state(), {term(), term()} | [{term(), term()}]) :: true
   def insert_records(state, records) do
     :ets.insert(state.id, records)
@@ -72,10 +80,11 @@ defmodule FileConfig.Handler.Bert do
     {:ok, bin} = File.read(path)
     {:ok, terms} = decode(bin)
 
-    {_name, records} = terms
-                       |> List.flatten()
-                       |> Enum.sort() # TODO: why are we sorting?
-                       |> parse_records(config)
+    {_name, records} =
+      terms
+      |> List.flatten()
+      |> Enum.sort() # TODO: why are we sorting?
+      |> parse_records(config)
     # |> validate()
 
     true = :ets.insert(tid, records)
@@ -104,11 +113,13 @@ defmodule FileConfig.Handler.Bert do
       case parser.decode(value, parser_opts) do
         {:ok, new} ->
           {key, new}
+
         {:error, reason} ->
           Logger.debug("Error parsing table #{name} key #{key}: #{inspect reason}")
           {key, value}
       end
     end
+
     {name, values}
   end
 

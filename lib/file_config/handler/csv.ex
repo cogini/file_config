@@ -6,6 +6,9 @@ defmodule FileConfig.Handler.Csv do
   alias FileConfig.Loader
   alias FileConfig.Lib
 
+  @spec init_config(map(), Keyword.t()) :: {:ok, map()} | {:error, term()}
+  def init_config(config, _args), do: {:ok, config}
+
   @spec lookup(Loader.table_state(), term()) :: term()
   def lookup(%{id: tid, name: name, lazy_parse: true, parser: parser} = state, key) do
     parser_opts = state[:parser_opts] || []
@@ -42,12 +45,7 @@ defmodule FileConfig.Handler.Csv do
     end
   end
 
-  # @spec load_update(Loader.name(), Loader.update(), :ets.tid()) :: Loader.table_state()
-  # def load_update(name, update, tid) do
-  #   load_update(name, update, tid, nil)
-  # end
-
-  @spec load_update(Loader.name(), Loader.update(), :ets.tid(), Loader.update() | nil) :: Loader.table_state()
+  @spec load_update(Loader.name(), Loader.update(), :ets.tid(), Loader.update()) :: Loader.table_state()
   def load_update(name, update, tid, prev) do
     config = update.config
 
@@ -61,7 +59,7 @@ defmodule FileConfig.Handler.Csv do
     for {path, state} <- files do
       Logger.debug("Loading #{name} #{config.format} #{path} #{inspect(state.mod)}")
       # TODO: handle parse errors
-      {time, {:ok, rec}} = :timer.tc(__MODULE__, :parse_file, [path, tid, config])
+      {time, {:ok, rec}} = :timer.tc(&parse_file/3, [path, tid, config])
       Logger.info("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
     end
 
