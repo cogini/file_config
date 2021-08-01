@@ -92,4 +92,16 @@ defmodule FileConfig.Lib do
     end
   end
 
+  # def parse_int(""), do: 0
+  #
+  # def parse_int(bin) do
+  #   case Integer.parse(bin) do
+  #     {value, _tail} ->
+  #       value
+  #
+  #     :error ->
+  #       0
+  #   end
+  # end
+
 end

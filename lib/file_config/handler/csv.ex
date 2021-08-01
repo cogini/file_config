@@ -167,16 +167,4 @@ defmodule FileConfig.Handler.Csv do
         acc
     end
   end
-
-  defp parse_int(""), do: 0
-
-  defp parse_int(bin) do
-    case Integer.parse(bin) do
-      {value, _tail} ->
-        value
-
-      :error ->
-        0
-    end
-  end
 end
