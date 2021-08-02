@@ -4,9 +4,11 @@ defmodule FileConfig.Application do
 
   use Application
 
+  @impl true
   def start(_type, _args) do
 
-    {:ok, _} = Application.ensure_all_started(:file_config_rocksdb, :permanent)
+    # {:ok, _} = Application.ensure_all_started(:file_config_rocksdb, :permanent)
+    # {:ok, _} = Application.ensure_all_started(:file_config_sqlite, :permanent)
 
     children = [
       {FileConfig.EventProducer, []},

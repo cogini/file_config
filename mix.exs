@@ -39,7 +39,7 @@ defmodule FileConfig.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {FileConfig.Application, []}
+      # mod: {FileConfig.Application, []}
     ]
   end
 
@@ -57,9 +57,9 @@ defmodule FileConfig.MixProject do
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.23", only: :dev, runtime: false},
       {:excoveralls, "~> 0.14.0", only: [:dev, :test], runtime: false},
-      {:file_config_rocksdb, github: "cogini/file_config_rocksdb"},
+      # {:file_config_rocksdb, github: "cogini/file_config_rocksdb"},
       # {:file_config_rocksdb, path: "../file_config_rocksdb"},
-      {:file_config_sqlite, github: "cogini/file_config_sqlite"},
+      # {:file_config_sqlite, github: "cogini/file_config_sqlite"},
       # {:file_config_sqlite, path: "../file_config_sqlite"},
       {:gen_stage, "~> 1.0"},
       {:jason, "~> 1.2"},
