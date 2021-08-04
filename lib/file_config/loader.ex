@@ -226,6 +226,7 @@ defmodule FileConfig.Loader do
         case Map.fetch(old_files, name) do
           :error -> # New file
             Map.put(acc, name, v)
+
           {:ok, %{mod: prev_mod}} -> # Existing file
             # Get files that have been modified since last time
             mod_files = for {_p, %{mod: mod}} = f <- v.files, mod > prev_mod, do: f
@@ -243,16 +244,22 @@ defmodule FileConfig.Loader do
   @doc "Get just changed files or all based on config"
   @spec changed_files?(map(), map()) :: map()
   def changed_files?(update, prev)
+
+  # All files
   def changed_files?(%{config: %{changed: false}} = update, _), do: update
+
+  # Only files which have been changed since previous run
   def changed_files?(update, %{mod: prev_mod}) do
     files = for {_p, %{mod: mod}} = f <- update.files, mod > prev_mod, do: f
     %{update | files: files}
   end
+
   def changed_files?(update, _), do: update
 
   @doc "Get latest file or all based on config"
   @spec latest_file?(map()) :: list({Path.t(), map()})
   def latest_file?(%{config: %{update: :latest}} = update), do: [hd(update.files)]
+
   def latest_file?(update), do: update.files
 
   # @doc "Load data from changed files"
@@ -328,9 +335,11 @@ defmodule FileConfig.Loader do
         tid = create_ets_table(config)
         Logger.debug("Created ETS table #{name} new #{inspect(tid)}")
         tid
+
       [{_name, %{id: tid, mod: m}}] when m == mod ->
         Logger.debug("Using existing ETS table #{name} #{inspect(tid)}")
         tid
+
       [{_name, %{}}] ->
         tid = create_ets_table(config)
         Logger.debug("Created ETS table #{name} update #{inspect(tid)}")
@@ -360,6 +369,7 @@ defmodule FileConfig.Loader do
             [] ->
               Logger.debug("ETS new table: #{name}")
               acc
+
             [{_name, %{id: tid}}] ->
               Logger.debug("ETS old table: #{name} #{inspect(tid)}")
               [{name, tid} | acc]
@@ -382,6 +392,7 @@ defmodule FileConfig.Loader do
       Logger.debug("Deleting ETS table: #{inspect(name)} #{inspect(tid)}")
       :ets.delete(tid)
     end
+
     :ok
   end
 
