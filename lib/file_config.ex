@@ -34,7 +34,7 @@ defmodule FileConfig do
   def insert(name, records) do
     case table_info(name) do
       :undefined ->
-        Logger.warn("Unkown table #{name}")
+        Logger.warn("Unknown table #{name}")
         true
 
       %{handler: handler} = table_state ->
@@ -57,7 +57,7 @@ defmodule FileConfig do
   def flush(name) do
     case table_info(name) do
       :undefined ->
-        Logger.warn("Unkown table #{name}")
+        Logger.warn("Unknown table #{name}")
         true
 
       %{handler: _handler} = table_state ->
