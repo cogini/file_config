@@ -50,7 +50,7 @@
 %%   In  = binary(), input csv data to parse
 %%   Fun = fun({line, Line}, Acc0) -> Acc, 
 %%      Line  - list() list of parsed fields in reverse order
-%%   Acc0 = term() application specific state/term carried throught
+%%   Acc0 = term() application specific state/term carried through
 %%                 parser event hadlers
 %%
 %% @doc sequentially parses csv file
