@@ -230,7 +230,6 @@ defmodule FileConfig.Loader do
           {:ok, %{mod: prev_mod}} -> # Existing file
             # Get files that have been modified since last time
             mod_files = for {_p, %{mod: mod}} = f <- v.files, mod > prev_mod, do: f
-            # TODO: check for empty not length
             if Enum.empty?(mod_files) do
               acc
             else
