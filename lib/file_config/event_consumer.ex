@@ -1,4 +1,6 @@
 defmodule FileConfig.EventConsumer do
+  @moduledoc false
+
   use GenStage
 
   require Logger
@@ -16,9 +18,9 @@ defmodule FileConfig.EventConsumer do
 
   def handle_events(events, _from, state) do
     for event <- events do
-      Logger.debug("Received event #{inspect event}")
+      Logger.debug("Received event #{inspect(event)}")
     end
+
     {:noreply, [], state}
   end
 end
-
