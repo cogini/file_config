@@ -6,8 +6,8 @@ defmodule FileConfig do
   @table FileConfig.Loader
   @match_limit 500
 
-  @type name :: atom
-  @opaque version :: {:vsn, term}
+  @type name :: atom()
+  @opaque version :: {:vsn, term()}
 
   # Public API
 
@@ -30,7 +30,7 @@ defmodule FileConfig do
   end
 
   @doc "Insert records"
-  @spec insert(name, {atom, term} | [{atom, term}]) :: true
+  @spec insert(name(), {atom(), term()} | [{atom(), term()}]) :: true
   def insert(name, records) do
     case table_info(name) do
       :undefined ->
@@ -43,17 +43,18 @@ defmodule FileConfig do
   end
 
   @doc "Return all records in table"
-  @spec all(name, pos_integer) :: list(term)
+  @spec all(name(), pos_integer()) :: list(term())
   def all(name, match_limit) do
     loop_all({table(name), :_, match_limit})
   end
 
   @doc "Return all records in table, default match limit 500"
-  @spec all(name) :: list(term)
+  @spec all(name()) :: list(term())
   def all(name) do
     loop_all({table(name), :_, @match_limit})
   end
 
+  @spec flush(name()) :: true
   def flush(name) do
     case table_info(name) do
       :undefined ->
@@ -70,7 +71,7 @@ defmodule FileConfig do
   # The version is the table id, which should be swapped on
   # any update. This is a very scary thing to use, but it works
   # as long as we use it as an opaque data type.
-  @spec version(name) :: version
+  @spec version(name()) :: version()
   def version(name), do: {:vsn, table(name)}
 
   @spec version(name, version) :: :current | :old
