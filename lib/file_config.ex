@@ -20,12 +20,12 @@ defmodule FileConfig do
 
       %{handler: handler} = table_state ->
         handler.lookup(table_state, key)
-      # %{id: tid} -> # fallback
-      #   case :ets.lookup(tid, key) do
-      #     [] -> :undefined
-      #     [{^key, value}] ->
-      #       {:ok, value}
-      #   end
+        # %{id: tid} -> # fallback
+        #   case :ets.lookup(tid, key) do
+        #     [] -> :undefined
+        #     [{^key, value}] ->
+        #       {:ok, value}
+        #   end
     end
   end
 
@@ -91,16 +91,19 @@ defmodule FileConfig do
   #           | :"$end_of_table",
   # Collect results from ets all lookup
   defp loop_all(:"$end_of_table"), do: []
+
   defp loop_all({match, continuation}) do
     [match | loop_all(:ets.match_object(continuation))]
   end
+
   defp loop_all({:undefined, _, _}), do: []
+
   defp loop_all({tid, pat, limit}) do
     :lists.append(loop_all(:ets.match_object(tid, pat, limit)))
   end
 
   # Get table id for name from index
-  @spec table(name) :: :ets.tid | :undefined
+  @spec table(name) :: :ets.tid() | :undefined
   defp table(name) do
     try do
       case :ets.lookup(@table, name) do
@@ -115,7 +118,7 @@ defmodule FileConfig do
   end
 
   # Get all data for name from index
-  @spec table_info(name) :: FileConfig.Loader.table_state | :undefined
+  @spec table_info(name) :: FileConfig.Loader.table_state() | :undefined
   def table_info(name) do
     try do
       case :ets.lookup(@table, name) do
@@ -128,5 +131,4 @@ defmodule FileConfig do
         :undefined
     end
   end
-
 end
