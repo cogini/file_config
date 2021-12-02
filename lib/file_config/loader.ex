@@ -20,7 +20,8 @@ defmodule FileConfig.Loader do
 
   @impl true
   def init(args) do
-    Process.flag(:trap_exit, true) # Die gracefully
+    # Die gracefully
+    Process.flag(:trap_exit, true)
     __MODULE__ = :ets.new(__MODULE__, [:set, :public, :named_table, {:read_concurrency, true}])
 
     # Directories to look for files in
@@ -34,7 +35,8 @@ defmodule FileConfig.Loader do
     # How often to check for new files, in ms
     check_delay = args[:check_delay] || 5000
 
-    {old_tables, new_files} = check_files(%{}, %{data_dirs: data_dirs, file_configs: file_configs}, true)
+    {old_tables, new_files} =
+      check_files(%{}, %{data_dirs: data_dirs, file_configs: file_configs}, true)
 
     free_binary_memory()
 
@@ -43,7 +45,7 @@ defmodule FileConfig.Loader do
       files: new_files,
       file_configs: file_configs,
       data_dirs: data_dirs,
-      check_delay: check_delay,
+      check_delay: check_delay
     }
 
     {:ok, state, check_delay}
@@ -53,7 +55,8 @@ defmodule FileConfig.Loader do
   @spec handle_info(term(), map()) :: {:noreply, map()}
   def handle_info(:timeout, state) do
     # %{ref: ^ref, files: files, old_tables: old_old_tables} = state # TODO check ref matching
-    %{files: files, old_tables: old_old_tables} = state # TODO check ref matching
+    # TODO check ref matching
+    %{files: files, old_tables: old_old_tables} = state
     {old_tables, new_files} = check_files(files, state)
     delete_tables(old_old_tables)
 
@@ -78,8 +81,7 @@ defmodule FileConfig.Loader do
     new_tables =
       for {name, update} <- new_files,
           {:ok, prev} = get_prev(name, old_files),
-          modified?(name, update, prev)
-      do
+          modified?(name, update, prev) do
         tid = maybe_create_table(update)
         config = update.config
         config.handler.load_update(name, update, tid, prev)
@@ -128,7 +130,7 @@ defmodule FileConfig.Loader do
           name: name,
           format: format,
           handler: handler,
-          regex: regex,
+          regex: regex
         }
 
         config = Map.merge(config, derived_config)
@@ -144,32 +146,34 @@ defmodule FileConfig.Loader do
   def get_files(data_dirs, file_configs, init \\ false) do
     path_configs =
       for data_dir <- data_dirs,
-        path <- list_files(data_dir),
-        config <- file_configs,
-        Regex.match?(config.regex, path), do: {path, config}
+          path <- list_files(data_dir),
+          config <- file_configs,
+          Regex.match?(config.regex, path),
+          do: {path, config}
 
     # Skip files marked as async on initial startup pass.
     # This allows the program to start up more quickly and
     # handle reuests, processing the files on the next scheduled run.
-    is_async =
-      fn
-        {path, %{async: true}} ->
-          if init do
-            Logger.debug("Skipping async file #{path}")
-            true
-          else
-            false
-          end
-        _ ->
+    is_async = fn
+      {path, %{async: true}} ->
+        if init do
+          Logger.debug("Skipping async file #{path}")
+          true
+        else
           false
-      end
+        end
+
+      _ ->
+        false
+    end
 
     path_configs = Enum.reject(path_configs, is_async)
 
     files =
       for {path, config} <- path_configs,
-        {:ok, stat} = File.stat(path),
-        stat.size > 0, do: {path, config, %{mod: stat.mtime}}
+          {:ok, stat} = File.stat(path),
+          stat.size > 0,
+          do: {path, config, %{mod: stat.mtime}}
 
     # for {path, config, mtime} <- files do
     #   Logger.debug("file: #{inspect(path)} #{inspect(config)} #{inspect(mtime)}")
@@ -184,11 +188,9 @@ defmodule FileConfig.Loader do
   @spec list_files(Path.t()) :: [Path.t()]
   def list_files(dir) do
     with {:ok, _stat} <- File.stat(dir),
-         {:ok, files} <- File.ls(dir)
-    do
+         {:ok, files} <- File.ls(dir) do
       for file <- files,
-          Path.extname(file) in @extensions
-      do
+          Path.extname(file) in @extensions do
         Path.join(dir, file)
       end
     else
@@ -204,6 +206,7 @@ defmodule FileConfig.Loader do
     case Map.fetch(acc, name) do
       :error ->
         Map.put(acc, name, %{files: [{path, state}], config: config})
+
       {:ok, %{files: files}} ->
         put_in(acc[name].files, [{path, state} | files])
     end
@@ -221,23 +224,26 @@ defmodule FileConfig.Loader do
   @doc "Determine if files have changed since last run"
   @spec get_changed_files(files(), files()) :: files()
   def get_changed_files(new_files, old_files) do
-    Enum.reduce(new_files, %{},
-      fn {name, v}, acc ->
-        case Map.fetch(old_files, name) do
-          :error -> # New file
-            Map.put(acc, name, v)
+    Enum.reduce(new_files, %{}, fn {name, v}, acc ->
+      case Map.fetch(old_files, name) do
+        # New file
+        :error ->
+          Map.put(acc, name, v)
 
-          {:ok, %{mod: prev_mod}} -> # Existing file
-            # Get files that have been modified since last time
-            mod_files = for {_p, %{mod: mod}} = f <- v.files, mod > prev_mod, do: f
-            if Enum.empty?(mod_files) do
-              acc
-            else
-              # Map.put(acc, name, %{v | files: mod_files}) # only modified files
-                Map.put(acc, name, v) # keep all files
-            end
-        end
-      end)
+        # Existing file
+        {:ok, %{mod: prev_mod}} ->
+          # Get files that have been modified since last time
+          mod_files = for {_p, %{mod: mod}} = f <- v.files, mod > prev_mod, do: f
+
+          if Enum.empty?(mod_files) do
+            acc
+          else
+            # Map.put(acc, name, %{v | files: mod_files}) # only modified files
+            # keep all files
+            Map.put(acc, name, v)
+          end
+      end
+    end)
   end
 
   @doc "Get just changed files or all based on config"
@@ -278,8 +284,11 @@ defmodule FileConfig.Loader do
   @spec make_table_state(module(), name(), map(), :ets.tid()) :: table_state()
   def make_table_state(handler, name, update, tid) do
     %{config: config, mod: mod} = update
-    Map.merge(%{name: name, id: tid, mod: mod, handler: handler},
-      Map.take(config, [:lazy_parse, :parser, :parser_opts]))
+
+    Map.merge(
+      %{name: name, id: tid, mod: mod, handler: handler},
+      Map.take(config, [:lazy_parse, :parser, :parser_opts])
+    )
   end
 
   # @doc "Load data from files"
@@ -315,11 +324,10 @@ defmodule FileConfig.Loader do
     false
   end
 
-  def modified?(name, _ , _) do
+  def modified?(name, _, _) do
     Logger.debug("#{name}: Files modified")
     true
   end
-
 
   @doc "Create table if new/update"
   def maybe_create_table(update) do
@@ -329,6 +337,7 @@ defmodule FileConfig.Loader do
   @spec maybe_create_table(:calendar.datetime(), map()) :: :ets.tid()
   def maybe_create_table(mod, config) do
     name = config.name
+
     case :ets.lookup(__MODULE__, name) do
       [] ->
         tid = create_ets_table(config)
@@ -362,18 +371,17 @@ defmodule FileConfig.Loader do
   def update_table_index(new_tables) do
     # Get ids of tables which already exist and we are replacing
     old_tables =
-      Enum.reduce(new_tables, [],
-        fn %{name: name}, acc ->
-          case :ets.lookup(__MODULE__, name) do
-            [] ->
-              Logger.debug("ETS new table: #{name}")
-              acc
+      Enum.reduce(new_tables, [], fn %{name: name}, acc ->
+        case :ets.lookup(__MODULE__, name) do
+          [] ->
+            Logger.debug("ETS new table: #{name}")
+            acc
 
-            [{_name, %{id: tid}}] ->
-              Logger.debug("ETS old table: #{name} #{inspect(tid)}")
-              [{name, tid} | acc]
-          end
-        end)
+          [{_name, %{id: tid}}] ->
+            Logger.debug("ETS old table: #{name} #{inspect(tid)}")
+            [{name, tid} | acc]
+        end
+      end)
 
     # Update index with ids of current tables
     table_tuples = for %{name: name} = table <- new_tables, do: {name, table}
@@ -421,7 +429,7 @@ defmodule FileConfig.Loader do
   def format_to_handler(:dat), do: FileConfig.Handler.Dat
 
   def list_index do
-    :ets.foldl(fn({key, value}, acc) -> [{key, value} | acc] end, [], __MODULE__)
+    :ets.foldl(fn {key, value}, acc -> [{key, value} | acc] end, [], __MODULE__)
   end
 
   # defp is_async({_name, %{config: %{async: true}}}), do: true
@@ -430,6 +438,7 @@ defmodule FileConfig.Loader do
   # Manually trigger garbage collection to clear refc binary memory
   def free_binary_memory do
     {:binary_memory, binary_memory} = :recon.info(self(), :binary_memory)
+
     if binary_memory > 50_000_000 do
       Logger.debug("Forcing garbage collection")
       :erlang.garbage_collect(self())
