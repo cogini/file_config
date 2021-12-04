@@ -37,7 +37,8 @@ defmodule FileConfig.Handler.Dat do
     end
   end
 
-  @spec load_update(Loader.name(), Loader.update(), :ets.tid(), Loader.update()) :: Loader.table_state()
+  @spec load_update(Loader.name(), Loader.update(), :ets.tid(), Loader.update()) ::
+          Loader.table_state()
   def load_update(name, update, tid, prev) do
     config = update.config
 
@@ -77,7 +78,8 @@ defmodule FileConfig.Handler.Dat do
   defp decode(fh, tid, count) do
     case :file.read_line(fh) do
       {:ok, line} ->
-        case :re.run(line, '^\s*$|^//.*$') do # TODO: regex string
+        # TODO: regex string
+        case :re.run(line, '^\s*$|^//.*$') do
           :nomatch ->
             split = :re.split(line, "[\.|\n]", [:trim, {:return, :binary}])
             key = :lists.reverse(split)
@@ -85,10 +87,13 @@ defmodule FileConfig.Handler.Dat do
             value = Jason.encode(Enum.join(split, "."))
             :ets.insert(tid, [{key, value}])
             decode(fh, tid, count + 1)
+
           _ ->
             decode(fh, tid, count)
         end
-      _ -> {:ok, count}
+
+      _ ->
+        {:ok, count}
     end
   end
 end
