@@ -11,6 +11,7 @@ defmodule FileConfig.Loader do
   @type table_state :: map()
   @type update :: map()
   @type name :: atom()
+  @type state :: map()
 
   # GenServer callbacks
 
@@ -52,7 +53,7 @@ defmodule FileConfig.Loader do
   end
 
   @impl true
-  @spec handle_info(term(), map()) :: {:noreply, map()}
+  @spec handle_info(term(), state()) :: {:noreply, state()}
   def handle_info(:timeout, state) do
     # %{ref: ^ref, files: files, old_tables: old_old_tables} = state # TODO check ref matching
     # TODO check ref matching
@@ -74,7 +75,7 @@ defmodule FileConfig.Loader do
   # API
 
   @doc "Check for changes to configured files"
-  @spec check_files(files(), map()) :: {[:ets.tid()], files()}
+  @spec check_files(files(), state()) :: {[:ets.tab()], files()}
   def check_files(old_files, state, init \\ false) do
     new_files = get_files(state.data_dirs, state.file_configs, init)
 
@@ -82,9 +83,9 @@ defmodule FileConfig.Loader do
       for {name, update} <- new_files,
           {:ok, prev} = get_prev(name, old_files),
           modified?(name, update, prev) do
-        tid = maybe_create_table(update)
+        tab = maybe_create_table(update)
         config = update.config
-        config.handler.load_update(name, update, tid, prev)
+        config.handler.load_update(name, update, tab, prev)
       end
 
     for table <- new_tables do
@@ -153,7 +154,7 @@ defmodule FileConfig.Loader do
 
     # Skip files marked as async on initial startup pass.
     # This allows the program to start up more quickly and
-    # handle reuests, processing the files on the next scheduled run.
+    # handle requests, processing the files on the next scheduled run.
     is_async = fn
       {path, %{async: true}} ->
         if init do
@@ -272,21 +273,21 @@ defmodule FileConfig.Loader do
   # def process_changed_files(changed_files) do
   #   for {name, update} <- changed_files do
   #     config = update.config
-  #     tid = maybe_create_table(name, update.mod, config)
+  #     tab = maybe_create_table(name, update.mod, config)
   #     Logger.debug("Loading file #{name}")
-  #     config.handler.load_update(name, update, tid)
+  #     config.handler.load_update(name, update, tab)
   #   end
   # end
   #   # changed_files = get_changed_files(new_files, old_files)
   #   # new_tables = process_changed_files(changed_files)
 
   # Create table_sate data
-  @spec make_table_state(module(), name(), map(), :ets.tid()) :: table_state()
-  def make_table_state(handler, name, update, tid) do
+  @spec make_table_state(module(), name(), map(), :ets.tab()) :: table_state()
+  def make_table_state(handler, name, update, tab) do
     %{config: config, mod: mod} = update
 
     Map.merge(
-      %{name: name, id: tid, mod: mod, handler: handler},
+      %{name: name, id: tab, mod: mod, handler: handler},
       Map.take(config, [:lazy_parse, :parser, :parser_opts])
     )
   end
@@ -299,10 +300,10 @@ defmodule FileConfig.Loader do
   #     Logger.debug("#{name}: #{inspect(update)} #{inspect(prev)}")
   #
   #     config = update.config
-  #     tid = maybe_create_table(update)
+  #     tab = maybe_create_table(update)
   #
   #     if modified?(name, update, prev) do
-  #       config.handler.load_update(name, update, tid, prev)
+  #       config.handler.load_update(name, update, tab, prev)
   #
   #       FileConfig.EventProducer.sync_notify({:load, name})
   #     end
@@ -334,28 +335,28 @@ defmodule FileConfig.Loader do
     maybe_create_table(update.mod, update.config)
   end
 
-  @spec maybe_create_table(:calendar.datetime(), map()) :: :ets.tid()
+  @spec maybe_create_table(:calendar.datetime(), map()) :: :ets.tab()
   def maybe_create_table(mod, config) do
     name = config.name
 
     case :ets.lookup(__MODULE__, name) do
       [] ->
-        tid = create_ets_table(config)
-        Logger.debug("Created ETS table #{name} new #{inspect(tid)}")
-        tid
+        tab = create_ets_table(config)
+        Logger.debug("Created ETS table #{name} new #{inspect(tab)}")
+        tab
 
-      [{_name, %{id: tid, mod: m}}] when m == mod ->
-        Logger.debug("Using existing ETS table #{name} #{inspect(tid)}")
-        tid
+      [{_name, %{id: tab, mod: m}}] when m == mod ->
+        Logger.debug("Using existing ETS table #{name} #{inspect(tab)}")
+        tab
 
       [{_name, %{}}] ->
-        tid = create_ets_table(config)
-        Logger.debug("Created ETS table #{name} update #{inspect(tid)}")
-        tid
+        tab = create_ets_table(config)
+        Logger.debug("Created ETS table #{name} update #{inspect(tab)}")
+        tab
     end
   end
 
-  @spec create_ets_table(map()) :: :ets.tid()
+  @spec create_ets_table(map()) :: :ets.tab()
   def create_ets_table(%{name: name, ets_opts: ets_opts}) do
     Logger.debug("Creating ETS table with opts #{inspect(ets_opts)}")
     :ets.new(name, ets_opts)
@@ -367,7 +368,7 @@ defmodule FileConfig.Loader do
     :ets.new(name, ets_opts)
   end
 
-  @spec update_table_index([table_state()]) :: [:ets.tid()]
+  @spec update_table_index([table_state()]) :: [:ets.tab()]
   def update_table_index(new_tables) do
     # Get ids of tables which already exist and we are replacing
     old_tables =
@@ -377,9 +378,9 @@ defmodule FileConfig.Loader do
             Logger.debug("ETS new table: #{name}")
             acc
 
-          [{_name, %{id: tid}}] ->
-            Logger.debug("ETS old table: #{name} #{inspect(tid)}")
-            [{name, tid} | acc]
+          [{_name, %{id: tab}}] ->
+            Logger.debug("ETS old table: #{name} #{inspect(tab)}")
+            [{name, tab} | acc]
         end
       end)
 
@@ -395,9 +396,9 @@ defmodule FileConfig.Loader do
 
   @spec delete_tables(list(:ets.tab())) :: :ok
   def delete_tables(tables) do
-    for {name, tid} <- tables do
-      Logger.debug("Deleting ETS table: #{inspect(name)} #{inspect(tid)}")
-      :ets.delete(tid)
+    for {name, tab} <- tables do
+      Logger.debug("Deleting ETS table: #{inspect(name)} #{inspect(tab)}")
+      :ets.delete(tab)
     end
 
     :ok
