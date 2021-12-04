@@ -22,11 +22,13 @@ defmodule FileConfig.EventProducer do
 
   @impl true
   def handle_call({:notify, event}, _from, state) do
-    {:reply, :ok, [event], state} # Dispatch immediately
+    # Dispatch immediately
+    {:reply, :ok, [event], state}
   end
 
   @impl true
   def handle_demand(_demand, state) do
-    {:noreply, [], state} # We don't care about the demand
+    # We don't care about the demand
+    {:noreply, [], state}
   end
 end
