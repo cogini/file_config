@@ -20,7 +20,7 @@ defmodule FileConfig.MixProject do
       dialyzer: [
         # plt_add_deps: :project,
         # plt_add_apps: [:ssl, :mnesia, :compiler, :xmerl, :inets, :disk_log],
-        plt_add_deps: true,
+        plt_add_deps: true
         # flags: ["-Werror_handling", "-Wrace_conditions"],
         # flags: ["-Wunmatched_returns", :error_handling, :race_conditions, :underspecs],
         # ignore_warnings: "dialyzer.ignore-warnings"
@@ -31,14 +31,14 @@ defmodule FileConfig.MixProject do
         "coveralls.detail": :test,
         "coveralls.post": :test,
         "coveralls.html": :test
-      ],
+      ]
     ]
   end
 
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger]
       # mod: {FileConfig.Application, []}
     ]
   end
@@ -48,7 +48,7 @@ defmodule FileConfig.MixProject do
 
   # Specifies which paths to compile per environment
   defp elixirc_paths(:test), do: ["lib", "test/support"]
-  defp elixirc_paths(_),     do: ["lib"]
+  defp elixirc_paths(_), do: ["lib"]
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
@@ -64,7 +64,7 @@ defmodule FileConfig.MixProject do
       {:gen_stage, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:murmur, "~> 1.0"},
-      {:recon, "~> 2.5", override: true},
+      {:recon, "~> 2.5", override: true}
     ]
   end
 
