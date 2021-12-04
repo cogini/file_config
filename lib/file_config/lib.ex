@@ -16,17 +16,19 @@ defmodule FileConfig.Lib do
     :lists.nth(l - i, list)
   end
 
-  @spec decode_json!(:ets.tid, atom, term, term) :: term
+  @spec decode_json!(:ets.tid(), atom, term, term) :: term
   def decode_json!(tid, name, key, value) when is_binary(value) do
     # case Jason.decode(value, keys: :atoms, strings: :copy) do
     case Jason.decode(value, keys: :atoms) do
       {:ok, value} ->
         true = :ets.insert(tid, {key, value})
         value
+
       {:error, reason} ->
-        Logger.debug("Invalid binary JSON for table #{name} key #{key}: #{inspect reason}")
+        Logger.debug("Invalid binary JSON for table #{name} key #{key}: #{inspect(reason)}")
         value
     end
+
     # if :jsx.is_json(value) do
     #   value = :jsx.decode(value, [{:labels, :atom}, :return_maps])
     #   true = :ets.insert(tid, {key, value})
@@ -36,6 +38,7 @@ defmodule FileConfig.Lib do
     #   value
     # end
   end
+
   def decode_json!(_tid, _name, _key, value), do: value
 
   @doc "Get modification time of file, or Unix epoch on error"
@@ -62,7 +65,6 @@ defmodule FileConfig.Lib do
     fn [key, value | _rest] -> [key, value] end
   end
 
-
   @doc ~S"""
   Uniformly allocate data to one of a fixed set of buckets.
 
@@ -82,10 +84,12 @@ defmodule FileConfig.Lib do
   """
   @spec hash_to_bucket(term(), pos_integer()) :: pos_integer()
   def hash_to_bucket(_e, 1), do: 1
+
   def hash_to_bucket(e, buckets) do
     i = Murmur.hash_x86_128(e)
     p = i / :math.pow(2, 128)
     b = buckets / 1.0
+
     for j <- Range.new(0, buckets - 1), reduce: buckets do
       _acc when j / b <= p and (j + 1) / b > p -> j + 1
       acc -> acc
@@ -103,5 +107,4 @@ defmodule FileConfig.Lib do
   #       0
   #   end
   # end
-
 end
