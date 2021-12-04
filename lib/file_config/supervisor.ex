@@ -24,16 +24,17 @@ defmodule FileConfig.Supervisor do
     children = [
       {FileConfig.EventProducer, []},
       # {FileConfig.EventConsumer, []},
-      {FileConfig.Loader, [
-        state_dir: args[:state_dir],
-        files: args[:files] || [],
-        data_dirs: args[:data_dirs] || [],
-        check_delay: args[:check_delay] || 60_000,
-      ]},
+      {FileConfig.Loader,
+       [
+         state_dir: args[:state_dir],
+         files: args[:files] || [],
+         data_dirs: args[:data_dirs] || [],
+         check_delay: args[:check_delay] || 60_000
+       ]}
     ]
 
     options = [
-      strategy: :one_for_one,
+      strategy: :one_for_one
       # max_restarts: 100,
       # max_seconds: 30,
     ]
@@ -41,4 +42,3 @@ defmodule FileConfig.Supervisor do
     Supervisor.init(children, options)
   end
 end
-
