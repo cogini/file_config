@@ -3,15 +3,13 @@ defmodule FileConfig.Loader.State do
 
   alias FileConfig.Loader.Tab
 
-  defstruct [
-    ref: nil,
-    files: %{},
-    old_tables: []
-  ]
+  defstruct ref: nil,
+            files: %{},
+            old_tables: []
 
   @type t :: %__MODULE__{
-    ref: reference,
-    files: map,
-    old_tables: list(Tab)
-  }
+          ref: reference,
+          files: map,
+          old_tables: list(Tab)
+        }
 end
