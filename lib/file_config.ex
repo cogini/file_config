@@ -26,7 +26,7 @@ defmodule FileConfig do
   end
 
   @doc "Insert one or more records"
-  @spec insert(table_name(), {atom(), term()} | [{atom(), term()}]) :: :ok | {:error, reason()}
+  @spec insert(table_name(), {term(), term()} | [{term(), term()}]) :: :ok | {:error, reason()}
   # @spec insert(table_name(), {atom(), term()} | [{atom(), term()}]) :: true
   def insert(table_name, records) do
     case table_info(table_name) do
