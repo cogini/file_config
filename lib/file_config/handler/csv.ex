@@ -6,47 +6,74 @@ defmodule FileConfig.Handler.Csv do
   alias FileConfig.Loader
   alias FileConfig.Lib
 
-  @spec init_config(map(), Keyword.t()) :: {:ok, map()} | {:error, term()}
-  def init_config(config, _args), do: {:ok, config}
+  @type reason :: FileConfig.reason()
 
-  @spec lookup(Loader.table_state(), term()) :: term()
-  def lookup(%{id: tid, name: name, lazy_parse: true, parser: parser} = state, key) do
+  @spec init_config(map(), Keyword.t()) :: {:ok, map()} | {:error, reason()}
+  def init_config(config, _args) do
+    {:ok, config}
+  end
+
+  @spec read(Loader.table_state(), term()) :: {:ok, term()} | nil | {:error, reason()}
+  def read(%{id: tab, lazy_parse: true, parser: parser} = state, key) do
     parser_opts = state[:parser_opts] || []
 
-    case :ets.lookup(tid, key) do
-      [] ->
-        :undefined
-
+    case :ets.lookup(tab, key) do
       [{_key, bin}] when is_binary(bin) ->
         case parser.decode(bin, parser_opts) do
           {:ok, value} ->
             # Cache parsed value
-            true = :ets.insert(tid, [{key, value}])
+            true = :ets.insert(tab, [{key, value}])
             {:ok, value}
 
           {:error, reason} ->
-            Logger.debug("Error parsing table #{name} key #{key}: #{inspect(reason)}")
-            {:ok, bin}
+            {:error, {:parse, bin, reason}}
         end
 
       [{_key, value}] ->
         # Cached result
         {:ok, value}
-    end
-  end
 
-  def lookup(%{id: tid}, key) do
-    case :ets.lookup(tid, key) do
       [] ->
-        :undefined
-
-      [{_key, value}] ->
-        {:ok, value}
+        nil
     end
   end
 
-  @spec load_update(Loader.name(), Loader.update(), :ets.tid(), Loader.update()) :: Loader.table_state()
-  def load_update(name, update, tid, prev) do
+  def read(%{id: tab}, key) do
+    case :ets.lookup(tab, key) do
+      [{_key, value}] ->
+        # Cached result
+        {:ok, value}
+
+      [] ->
+        # Not found
+        nil
+    end
+  end
+
+  @deprecated "Use read/2 instead"
+  @spec lookup(Loader.table_state(), term()) :: term()
+  def lookup(state, key) do
+    case read(state, key) do
+      {:ok, value} ->
+        value
+
+      nil ->
+        :undefined
+    end
+  end
+
+  @spec insert_records(Loader.table_state(), {term(), term()} | [{term(), term()}]) ::
+          :ok | {:error, FileConfig.reason()}
+  # @spec insert_records(Loader.table_state(), {term(), term()} | [{term(), term()}]) :: true
+  def insert_records(state, records) do
+    # Always succeeds or perhaps throws
+    :ets.insert(state.id, records)
+    :ok
+  end
+
+  @spec load_update(Loader.name(), Loader.update(), :ets.tab(), Loader.update()) ::
+          Loader.table_state()
+  def load_update(name, update, tab, prev) do
     config = update.config
 
     files =
@@ -58,38 +85,31 @@ defmodule FileConfig.Handler.Csv do
 
     for {path, state} <- files do
       Logger.debug("Loading #{name} #{config.format} #{path} #{inspect(state.mod)}")
-      # TODO: handle parse errors
-      {time, {:ok, rec}} = :timer.tc(&parse_file/3, [path, tid, config])
+      {time, {:ok, result}} = :timer.tc(&parse_file/3, [path, tab, config])
+      rec = result.record_count
       Logger.info("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
     end
 
-    Loader.make_table_state(__MODULE__, name, update, tid)
-  end
-
-  @spec insert_records(Loader.table_state(), {term(), term()} | [{term(), term()}]) :: true
-  def insert_records(state, records) do
-    :ets.insert(state.id, records)
+    Loader.make_table_state(__MODULE__, name, update, tab)
   end
 
   # Internal functions
 
-  @spec parse_file(Path.t(), :ets.tab(), map()) :: {:ok, non_neg_integer()}
-  def parse_file(path, tid, config) do
-    evt = make_cb(tid, config)
+  @spec parse_file(Path.t(), :ets.tab(), map()) :: {:ok, map()}
+  def parse_file(path, tab, config) do
+    evt = make_cb(tab, config)
     parser_processes = config[:parser_processes] || :erlang.system_info(:schedulers_online)
 
-    # {:ok, bin} = File.read(path)
-    # r = :file_config_csv2.pparse(bin, parser_processes, evt, 0)
-    # Logger.warning("File: #{path}")
     {tread, {:ok, bin}} = :timer.tc(File, :read, [path])
-    {tparse, r} = :timer.tc(:file_config_csv2, :pparse, [bin, parser_processes, evt, 0])
-    num_records = Enum.reduce(r, 0, &(&1 + &2))
-    Logger.debug(fn -> "Loaded #{config.format} #{path} read #{tread / 1_000_000} parse #{tparse / 1_000_000}" end)
-    {:ok, num_records}
+    {tparse, recs} = :timer.tc(:file_config_csv2, :pparse, [bin, parser_processes, evt, 0])
+    record_count = Enum.reduce(recs, 0, &(&1 + &2))
+
+    {:ok, %{record_count: record_count, read_duration: tread, parse_duration: tparse}}
   end
 
   # Make callback function for CSV parser
-  defp make_cb(tid, %{lazy_parse: true} = config) do
+  # @spec make_cb(:ets.tab(), map()) ::
+  defp make_cb(tab, %{lazy_parse: true} = config) do
     {k, v} = config[:csv_fields] || {1, 2}
 
     fn
@@ -99,7 +119,7 @@ defmodule FileConfig.Handler.Csv do
         key = Lib.rnth(k, line, len)
         value = Lib.rnth(v, line, len)
 
-        true = :ets.insert(tid, {key, value})
+        true = :ets.insert(tab, {key, value})
         acc + 1
 
       # Called before parsing shard
@@ -112,7 +132,7 @@ defmodule FileConfig.Handler.Csv do
     end
   end
 
-  defp make_cb(tid, %{parser: parser} = config) do
+  defp make_cb(tab, %{parser: parser} = config) do
     {k, v} = config[:csv_fields] || {1, 2}
     name = config[:name]
     parser_opts = config[:parser_opts] || []
@@ -126,11 +146,12 @@ defmodule FileConfig.Handler.Csv do
 
         case parser.decode(bin, parser_opts) do
           {:ok, value} ->
-            true = :ets.insert(tid, {key, value})
+            true = :ets.insert(tab, {key, value})
 
           {:error, reason} ->
-            Logger.debug("Error parsing table #{name} key #{key}: #{inspect(reason)}")
-            true = :ets.insert(tid, {key, bin})
+            Logger.warning("Error parsing table #{name} key #{key}: #{inspect(reason)}")
+            # true = :ets.insert(tab, {key, {:error, {:parse, bin, reason}}})
+            true = :ets.insert(tab, {key, bin})
         end
 
         acc + 1
@@ -145,7 +166,7 @@ defmodule FileConfig.Handler.Csv do
     end
   end
 
-  defp make_cb(tid, config) do
+  defp make_cb(tab, config) do
     {k, v} = config[:csv_fields] || {1, 2}
 
     fn
@@ -155,7 +176,7 @@ defmodule FileConfig.Handler.Csv do
         key = Lib.rnth(k, line, len)
         value = Lib.rnth(v, line, len)
 
-        true = :ets.insert(tid, {key, value})
+        true = :ets.insert(tab, {key, value})
         acc + 1
 
       # Called before parsing shard

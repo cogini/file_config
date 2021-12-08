@@ -6,77 +6,93 @@ defmodule FileConfig do
   @table FileConfig.Loader
   @match_limit 500
 
-  @type name :: atom()
+  @type table_name :: atom()
   @opaque version :: {:vsn, term()}
+  @type reason :: atom() | binary()
+  # :ets.continuation()
+  @type continuation :: term()
 
-  # Public API
+  @doc "Read value from table"
+  @spec read(table_name(), term()) :: {:ok, term()} | nil | {:error, reason()}
+  # @spec read(table_name(), term()) :: {:ok, term()} | :undefined
+  def read(table_name, key) do
+    case table_info(table_name) do
+      {:ok, %{handler: handler} = table_state} ->
+        handler.read(table_state, key)
 
-  @doc "Read value from named table"
-  @spec read(name(), term()) :: :undefined | {:ok, term()}
-  def read(name, key) do
-    case table_info(name) do
-      :undefined ->
-        :undefined
-
-      %{handler: handler} = table_state ->
-        handler.lookup(table_state, key)
-        # %{id: tid} -> # fallback
-        #   case :ets.lookup(tid, key) do
-        #     [] -> :undefined
-        #     [{^key, value}] ->
-        #       {:ok, value}
-        #   end
+      err ->
+        err
     end
   end
 
-  @doc "Insert records"
-  @spec insert(name(), {atom(), term()} | [{atom(), term()}]) :: true
-  def insert(name, records) do
-    case table_info(name) do
-      :undefined ->
-        Logger.warn("Unknown table #{name}")
-        true
-
-      %{handler: handler} = table_state ->
+  @doc "Insert one or more records"
+  @spec insert(table_name(), {atom(), term()} | [{atom(), term()}]) :: :ok | {:error, reason()}
+  # @spec insert(table_name(), {atom(), term()} | [{atom(), term()}]) :: true
+  def insert(table_name, records) do
+    case table_info(table_name) do
+      {:ok, %{handler: handler} = table_state} ->
         handler.insert_records(table_state, records)
+
+      err ->
+        err
     end
   end
 
-  @doc "Return all records in table"
-  @spec all(name(), pos_integer()) :: list(term())
-  def all(name, match_limit) do
-    loop_all({table(name), :_, match_limit})
+  # @deprecated "Use read_all/2 instead"
+  @spec all(table_name(), pos_integer()) :: list(term())
+  def all(table_name, match_limit) do
+    {:ok, value} = read_all(table_name, match_limit)
+    value
   end
 
-  @doc "Return all records in table, default match limit 500"
-  @spec all(name()) :: list(term())
-  def all(name) do
-    loop_all({table(name), :_, @match_limit})
+  @doc "Return all records"
+  @spec read_all(table_name(), pos_integer()) :: {:ok, list()}
+  def read_all(table_name, match_limit \\ @match_limit) do
+    case table(table_name) do
+      {:ok, tab} ->
+        loop_all(tab, :_, match_limit)
+    end
   end
 
-  @spec flush(name()) :: true
-  def flush(name) do
-    case table_info(name) do
-      :undefined ->
-        Logger.warn("Unknown table #{name}")
-        true
 
-      %{handler: _handler} = table_state ->
+  @spec loop_all(:ets.tab(), :ets.match_pattern(), pos_integer()) :: {:ok, list()}
+  defp loop_all(tab, pat, limit) do
+    loop_all(:ets.match_object(tab, pat, limit), [])
+  end
+
+  @spec loop_all({list(), continuation()} | :"$end_of_table", list()) :: {:ok, list()}
+  defp loop_all({match, continuation}, acc) do
+    loop_all(:ets.match_object(continuation), [match | acc])
+  end
+
+  defp loop_all(:"$end_of_table", acc) do
+    {:ok, Enum.reverse(acc)}
+  end
+
+  @spec flush(table_name()) :: :ok | {:error, reason()}
+  # @spec flush(table_name()) :: true
+  def flush(table_name) do
+    case table_info(table_name) do
+      {:ok, %{handler: _handler} = table_state} ->
         # TODO: This should call flush on handler
         # handler.flush(table_state)
         :ets.delete_all_objects(table_state.id)
+        :ok
+
+      err ->
+        err
     end
   end
 
   # The version is the table id, which should be swapped on
   # any update. This is a very scary thing to use, but it works
   # as long as we use it as an opaque data type.
-  @spec version(name()) :: version()
-  def version(name), do: {:vsn, table(name)}
+  @spec version(table_name()) :: version()
+  def version(table_name), do: {:vsn, table(table_name)}
 
-  @spec version(name, version) :: :current | :old
-  def version(name, {:vsn, version}) do
-    if table(name) == version do
+  @spec version(table_name(), version()) :: :current | :old
+  def version(table_name, {:vsn, version}) do
+    if table(table_name) == version do
       :current
     else
       :old
@@ -85,51 +101,38 @@ defmodule FileConfig do
 
   # Private
 
-  # @typep match :: list(term)
-  # @spec loop_all(args) :: [match]
-  #     args :: {[match], :ets.continuation}
-  #           | {:ets.tid, :ets.match_pattern, pos_integer}
-  #           | :"$end_of_table",
-  # Collect results from ets all lookup
-  defp loop_all(:"$end_of_table"), do: []
-
-  defp loop_all({match, continuation}) do
-    [match | loop_all(:ets.match_object(continuation))]
-  end
-
-  defp loop_all({:undefined, _, _}), do: []
-
-  defp loop_all({tid, pat, limit}) do
-    :lists.append(loop_all(:ets.match_object(tid, pat, limit)))
-  end
-
-  # Get table id for name from index
-  @spec table(name) :: :ets.tid() | :undefined
-  defp table(name) do
+  # @doc "Get table id from index"
+  @spec table(table_name()) :: {:ok, :ets.tab()} | {:error, :unknown_table}
+  defp table(table_name) do
     try do
-      case :ets.lookup(@table, name) do
-        [{^name, %{id: tid}}] -> tid
-        [] -> :undefined
+      case :ets.lookup(@table, table_name) do
+        [{^table_name, %{id: tab}}] ->
+          {:ok, tab}
+
+        [] ->
+          {:error, :unknown_table}
       end
     catch
       :error, :badarg ->
-        Logger.warn("ets.lookup error for #{name} table #{@table}")
-        :undefined
+        {:error, :unknown_table}
     end
   end
 
-  # Get all data for name from index
-  @spec table_info(name) :: FileConfig.Loader.table_state() | :undefined
-  def table_info(name) do
+  @doc "Get all data from index"
+  @spec table_info(table_name()) :: {:ok, FileConfig.Loader.table_state()} | {:error, :unknown_table}
+  # @spec table_info(table_name()) :: FileConfig.Loader.table_state() | :undefined
+  def table_info(table_name) do
     try do
-      case :ets.lookup(@table, name) do
-        [{^name, tab}] -> tab
-        [] -> :undefined
+      case :ets.lookup(@table, table_name) do
+        [{^table_name, value}] ->
+          {:ok, value}
+
+        [] ->
+          {:error, :unknown_table}
       end
     catch
       :error, :badarg ->
-        Logger.warn("ets.lookup error for #{name} table #{@table}")
-        :undefined
+        {:error, :unknown_table}
     end
   end
 end

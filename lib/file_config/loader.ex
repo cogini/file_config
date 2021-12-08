@@ -239,7 +239,9 @@ defmodule FileConfig.Loader do
           if Enum.empty?(mod_files) do
             acc
           else
-            # Map.put(acc, name, %{v | files: mod_files}) # only modified files
+            # keep only modified files
+            # Map.put(acc, name, %{v | files: mod_files})
+
             # keep all files
             Map.put(acc, name, v)
           end

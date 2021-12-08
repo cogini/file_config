@@ -5,30 +5,31 @@ defmodule FileConfig.Handler.Bert do
 
   alias FileConfig.Loader
 
+  @type reason :: FileConfig.reason()
+
   @type namespace :: atom()
   @type nrecs :: {namespace(), [tuple()]}
 
-  @spec init_config(map(), Keyword.t()) :: {:ok, map()} | {:error, term()}
+  @spec init_config(map(), Keyword.t()) :: {:ok, map()} | {:error, reason()}
   def init_config(config, _args), do: {:ok, config}
 
-  @spec lookup(Loader.table_state(), term()) :: term()
-  def lookup(%{id: tid, name: name, config: %{lazy_parse: true, parser: parser}} = state, key) do
+  @spec read(Loader.table_state(), term()) :: {:ok, term()} | nil | {:error, reason()}
+  def read(%{id: tab, lazy_parse: true, parser: parser} = state, key) do
     parser_opts = state[:parser_opts] || []
 
-    case :ets.lookup(tid, key) do
+    case :ets.lookup(tab, key) do
       [] ->
-        :undefined
+        nil
 
       [{_key, bin}] when is_binary(bin) ->
         case parser.decode(bin, parser_opts) do
           {:ok, value} ->
             # Cache parsed value
-            true = :ets.insert(tid, [{key, value}])
+            true = :ets.insert(tab, [{key, value}])
             {:ok, value}
 
           {:error, reason} ->
-            Logger.debug("Error parsing table #{name} key #{key}: #{inspect(reason)}")
-            {:ok, bin}
+            {:error, {:parse, bin, reason}}
         end
 
       [{_key, value}] ->
@@ -37,18 +38,40 @@ defmodule FileConfig.Handler.Bert do
     end
   end
 
-  def lookup(%{id: tid}, key) do
-    case :ets.lookup(tid, key) do
+  def read(%{id: tab}, key) do
+    case :ets.lookup(tab, key) do
       [] ->
-        :undefined
+        nil
 
       [{_key, value}] ->
         {:ok, value}
     end
   end
 
-  @spec load_update(Loader.name(), Loader.update(), :ets.tid(), Loader.update()) :: Loader.table_state()
-  def load_update(name, update, tid, prev) do
+  @deprecated "Use read/2 instead"
+  @spec lookup(Loader.table_state(), term()) :: term()
+  def lookup(state, key) do
+    case read(state, key) do
+      {:ok, value} ->
+        value
+
+      nil ->
+        :undefined
+    end
+  end
+
+  @spec insert_records(Loader.table_state(), {term(), term()} | [{term(), term()}]) ::
+          :ok | {:error, FileConfig.reason()}
+  # @spec insert_records(Loader.table_state(), {term(), term()} | [{term(), term()}]) :: true
+  def insert_records(state, records) do
+    # Always succeeds or perhaps throws
+    :ets.insert(state.id, records)
+    :ok
+  end
+
+  @spec load_update(Loader.name(), Loader.update(), :ets.tab(), Loader.update()) ::
+          Loader.table_state()
+  def load_update(name, update, tab, prev) do
     config = update.config
 
     files =
@@ -61,33 +84,30 @@ defmodule FileConfig.Handler.Bert do
     for {path, state} <- files do
       Logger.debug("Loading #{name} #{config.format} #{path} #{inspect(state.mod)}")
       # TODO: handle parse errors
-      {time, {:ok, rec}} = :timer.tc(&parse_file/3, [path, tid, config])
+      {time, {:ok, rec}} = :timer.tc(&parse_file/3, [path, tab, config])
       Logger.info("Loaded #{name} #{config.format} #{path} #{rec} rec #{time / 1_000_000} sec")
     end
 
-    Loader.make_table_state(__MODULE__, name, update, tid)
-  end
-
-  @spec insert_records(Loader.table_state(), {term(), term()} | [{term(), term()}]) :: true
-  def insert_records(state, records) do
-    :ets.insert(state.id, records)
+    Loader.make_table_state(__MODULE__, name, update, tab)
   end
 
   # Internal functions
 
   @spec parse_file(Path.t(), :ets.tab(), map()) :: {:ok, non_neg_integer()}
-  def parse_file(path, tid, config) do
+  def parse_file(path, tab, config) do
     {:ok, bin} = File.read(path)
     {:ok, terms} = decode(bin)
 
     {_name, records} =
       terms
       |> List.flatten()
-      |> Enum.sort() # TODO: why are we sorting?
+      # TODO: why are we sorting?
+      |> Enum.sort()
       |> parse_records(config)
+
     # |> validate()
 
-    true = :ets.insert(tid, records)
+    true = :ets.insert(tab, records)
     {:ok, length(records)}
   end
 
@@ -109,16 +129,18 @@ defmodule FileConfig.Handler.Bert do
   defp parse_records({name, recs}, %{parser: parser} = config) do
     parser_opts = config[:parser_opts] || []
 
-    values = for {key, value} <- recs do
-      case parser.decode(value, parser_opts) do
-        {:ok, new} ->
-          {key, new}
+    values =
+      for {key, value} <- recs do
+        case parser.decode(value, parser_opts) do
+          {:ok, new} ->
+            {key, new}
 
-        {:error, reason} ->
-          Logger.debug("Error parsing table #{name} key #{key}: #{inspect reason}")
-          {key, value}
+          {:error, reason} ->
+            Logger.warning("Error parsing table #{name} key #{key}: #{inspect(reason)}")
+            # {key, {:error, {:parse, bin, reason}}}
+            {key, value}
+        end
       end
-    end
 
     {name, values}
   end
