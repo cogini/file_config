@@ -54,7 +54,6 @@ defmodule FileConfig do
     end
   end
 
-
   @spec loop_all(:ets.tab(), :ets.match_pattern(), pos_integer()) :: {:ok, list()}
   defp loop_all(tab, pat, limit) do
     loop_all(:ets.match_object(tab, pat, limit), [])
