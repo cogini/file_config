@@ -40,7 +40,7 @@ defmodule FileConfig do
 
   # @deprecated "Use read_all/2 instead"
   @spec all(table_name(), pos_integer()) :: list(term())
-  def all(table_name, match_limit) do
+  def all(table_name, match_limit \\ @match_limit) do
     {:ok, value} = read_all(table_name, match_limit)
     value
   end
