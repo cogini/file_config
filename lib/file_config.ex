@@ -65,7 +65,7 @@ defmodule FileConfig do
   end
 
   defp loop_all(:"$end_of_table", acc) do
-    {:ok, Enum.reverse(acc)}
+    {:ok, List.flatten(Enum.reverse(acc))}
   end
 
   @spec flush(table_name()) :: :ok | {:error, reason()}
