@@ -29,9 +29,10 @@ defmodule FileConfig.Loader do
     data_dirs = args[:data_dirs] || []
 
     {:ok, file_configs} = init_config(args)
-    # for file_config <- file_configs do
-    #   Logger.info("config: #{inspect(file_config)}")
-    # end
+    for file_config <- file_configs do
+      Logger.debug("config: #{inspect(file_config)}")
+      create_ets_table(file_config)
+    end
 
     # How often to check for new files, in ms
     check_delay = args[:check_delay] || 5000
