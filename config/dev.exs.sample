@@ -1,4 +1,4 @@
-use Mix.Config
+import Config
 
 config :file_config,
   data_dirs: ["/var/foo/data"],
@@ -23,3 +23,7 @@ config :file_config,
       data_parser: FileConfig.DataParser.Json,
     },
   ]
+
+config :logger, :default_formatter,
+  format: "$time $metadata[$level] $message\n",
+  metadata: [:file, :line]
