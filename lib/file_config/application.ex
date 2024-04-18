@@ -1,8 +1,8 @@
 defmodule FileConfig.Application do
   @moduledoc false
-  @app :file_config
-
   use Application
+
+  @app :file_config
 
   @impl true
   def start(_type, _args) do

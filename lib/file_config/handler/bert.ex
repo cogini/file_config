@@ -1,9 +1,9 @@
 defmodule FileConfig.Handler.Bert do
   @moduledoc "Handler for BERT files"
 
-  require Logger
-
   alias FileConfig.Loader
+
+  require Logger
 
   @type reason :: FileConfig.reason()
 
@@ -113,12 +113,10 @@ defmodule FileConfig.Handler.Bert do
 
   @spec decode(binary()) :: {:ok, term()} | {:error, term()}
   def decode(bin) when is_binary(bin) do
-    try do
-      {:ok, :erlang.binary_to_term(bin)}
-    catch
-      _type, exception ->
-        {:error, exception}
-    end
+    {:ok, :erlang.binary_to_term(bin)}
+  catch
+    _type, exception ->
+      {:error, exception}
   end
 
   @spec parse_records(list({atom(), list()}) | {atom(), list()}, map()) :: {atom(), list()}

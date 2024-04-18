@@ -1,10 +1,10 @@
 defmodule FileConfig.Handler.Csv do
   @moduledoc "Handler for CSV files"
 
-  require Logger
-
-  alias FileConfig.Loader
   alias FileConfig.Lib
+  alias FileConfig.Loader
+
+  require Logger
 
   @type reason :: FileConfig.reason()
 

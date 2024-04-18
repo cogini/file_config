@@ -1,9 +1,10 @@
 defmodule FileConfig.Loader do
   @moduledoc "Load files"
-  @extensions [".bert", ".csv", ".dat", ".log", ".json"]
-
   use GenServer
+
   require Logger
+
+  @extensions [".bert", ".csv", ".dat", ".log", ".json"]
 
   # @typedoc ""
   @type files :: map()
@@ -29,6 +30,7 @@ defmodule FileConfig.Loader do
     data_dirs = args[:data_dirs] || []
 
     {:ok, file_configs} = init_config(args)
+
     for file_config <- file_configs do
       Logger.debug("config: #{inspect(file_config)}")
       create_ets_table(file_config)

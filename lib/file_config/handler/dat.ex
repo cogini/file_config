@@ -1,9 +1,10 @@
 defmodule FileConfig.Handler.Dat do
   @moduledoc "Handler for dat files"
 
+  alias FileConfig.Loader
+
   require Logger
 
-  alias FileConfig.Loader
   # alias FileConfig.Lib
 
   @type reason :: FileConfig.reason()
@@ -88,7 +89,6 @@ defmodule FileConfig.Handler.Dat do
     Loader.make_table_state(__MODULE__, name, update, tab)
   end
 
-
   # Internal functions
 
   @spec parse_file(Path.t(), :ets.tab(), map()) :: {:ok, non_neg_integer()}
@@ -104,7 +104,7 @@ defmodule FileConfig.Handler.Dat do
     case :file.read_line(fh) do
       {:ok, line} ->
         # TODO: regex string
-        case :re.run(line, '^\s*$|^//.*$') do
+        case :re.run(line, ~c"^\s*$|^//.*$") do
           :nomatch ->
             split = :re.split(line, "[\.|\n]", [:trim, {:return, :binary}])
             key = :lists.reverse(split)

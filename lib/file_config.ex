@@ -103,35 +103,31 @@ defmodule FileConfig do
   # @doc "Get table id from index"
   @spec table(table_name()) :: {:ok, :ets.tab()} | {:error, :unknown_table}
   defp table(table_name) do
-    try do
-      case :ets.lookup(@table, table_name) do
-        [{^table_name, %{id: tab}}] ->
-          {:ok, tab}
+    case :ets.lookup(@table, table_name) do
+      [{^table_name, %{id: tab}}] ->
+        {:ok, tab}
 
-        [] ->
-          {:error, :unknown_table}
-      end
-    catch
-      :error, :badarg ->
+      [] ->
         {:error, :unknown_table}
     end
+  catch
+    :error, :badarg ->
+      {:error, :unknown_table}
   end
 
   @doc "Get all data from index"
   @spec table_info(table_name()) :: {:ok, FileConfig.Loader.table_state()} | {:error, :unknown_table}
   # @spec table_info(table_name()) :: FileConfig.Loader.table_state() | :undefined
   def table_info(table_name) do
-    try do
-      case :ets.lookup(@table, table_name) do
-        [{^table_name, value}] ->
-          {:ok, value}
+    case :ets.lookup(@table, table_name) do
+      [{^table_name, value}] ->
+        {:ok, value}
 
-        [] ->
-          {:error, :unknown_table}
-      end
-    catch
-      :error, :badarg ->
+      [] ->
         {:error, :unknown_table}
     end
+  catch
+    :error, :badarg ->
+      {:error, :unknown_table}
   end
 end
