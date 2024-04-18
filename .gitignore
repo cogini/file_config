@@ -13,9 +13,9 @@
 # Dev logs
 /log/
 
-/config/dev.exs
-/config/test.exs
-/config/prod.exs
+# /config/dev.exs
+# /config/test.exs
+# /config/prod.exs
 
 # Ignore .fetch files in case you like to edit your project deps locally.
 /.fetch
