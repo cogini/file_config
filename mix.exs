@@ -70,6 +70,7 @@ defmodule FileConfig.MixProject do
       {:junit_formatter, "~> 3.3", only: [:dev, :test], runtime: false},
       {:mix_audit, "~> 2.0", only: [:dev, :test], runtime: false},
       {:murmur, "~> 1.0"},
+      {:recon, "~> 2.5", override: true},
       {:styler, "~> 0.11.0", only: [:dev, :test], runtime: false}
     ]
   end
